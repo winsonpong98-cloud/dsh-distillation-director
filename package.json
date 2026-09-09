@@ -1,0 +1,34 @@
+{
+  "name": "dsh-distillation-director",
+  "version": "4.1.0",
+  "license": "AGPL-3.0",
+  "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.1 三闸门禁制）",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "SKILL.md",
+    "extractors",
+    "scripts",
+    "manual-history",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "verify": "node --test"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  }
+}
