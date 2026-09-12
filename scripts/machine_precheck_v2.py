@@ -6,6 +6,18 @@ v2 = v1 + (1) d6 池 id 实存自动核验（家族约定文件自动发现）
         (3) runtime 红灯扫描（darwin gate 项）
         (4) 验证面扩展：对比器 v2 跑 6 技能（rse/trv/afd/oc/lvs/rp）
 
+v4.2（2026-09-12）：加 `--host-only-refs`／`--book-base` 两个 opt-in 开关（默认行为不变）。
+v4.3（2026-09-12，**当前默认口径已改**）：把 v4.2 的"正确口径"合入默认，并加两个复现开关——
+  · **d6-c1**：技能路径在 `.dsh\skills\` 下（宿主技能）时，实存集合**只取宿主一级目录**（原稿副本不算"实存"，
+    因为引擎不加载原稿树）。复现旧口径：加 `--drafts-in-refs`。
+  · **d6-c2/c3/c5**：宿主技能默认**自动定位原书册根**（按 slug 在 `投资蒸馏/**/skills/<slug>/` 反查，排除 snapshots）；
+    查不到（如 buffett／munger 这类宿主原创技能）则发 `skip`（deduct 0，不再恒 fail）。复现旧口径：加 `--legacy-book-checks`。
+  · 理由：旧口径下这三条对**全部宿主技能**恒 fail，是**结构性假阳性**，会把"零新增 fail"的批界对比污染成"假性新增"；
+    同时 d6-c1 会漏判归档死链。改对之后只有**真实**问题才报 fail。
+
+**权威位置**：本文件是权威实现，与 `distillation-director-plugin\scripts\machine_precheck_v2.py` 保持**逐字节同步**；
+一致性检查脚本 `check_script_sync.py`（本目录）。改这里之后请同步插件副本。
+
 对一份 SKILL.md 跑 9 维"机械层初评"：
 - 只做可确定性判定的子规则（rubric 明文规则 + 枚举式关键词/行号证据）；
 - 语义窄域（"步骤真可执行""描述含金量""冗余程度"等）不硬判，
@@ -19,7 +31,8 @@ v2 = v1 + (1) d6 池 id 实存自动核验（家族约定文件自动发现）
   judge raw 对拍看"方向一致性与幅度漂移"，不冒充校准后分数。
 
 用法：
-  python machine_precheck_v1.py <SKILL.md 路径> [--out <json 路径>]
+  python machine_precheck_v2.py <SKILL.md 路径> [--out <json 路径>]
+      [--book-base <该书册根目录>] [--drafts-in-refs] [--legacy-book-checks]
 """
 import os
 import re
@@ -28,6 +41,52 @@ import json
 import glob as _g
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # 蒸馏工作区
+
+# ------------------- v4.3 默认口径（由 v4.2 的 opt-in 提升为默认；可显式回退） -------------------
+# 背景（2026-09-12 实测）：
+#   ① d6-c1 的"全库实存"把**原稿副本**（投资蒸馏/**/skills/*/SKILL.md）也算作实存 →
+#      归档 slug 只要还有原稿副本就不被判缺 → 该检查**测不出归档死链**。
+#      → v4.3 默认：宿主技能只用**宿主技能根一级目录**做实存集合；`--drafts-in-refs` 复现旧口径。
+#   ② d6-c2/c3/c5 用 skill_path 反推书册根目录（取路径里 'skills' 段的父目录）→ 对**宿主技能**
+#      （…\金融投资\.dsh\skills\<slug>\SKILL.md）反推出 …\金融投资\.dsh，那里永无 candidates/ →
+#      这三条对全部宿主技能恒 fail/warn。
+#      → v4.3 默认：宿主技能先按 slug 自动反查原书册根；查不到则三条发 skip（不扣分）；
+#        `--legacy-book-checks` 复现旧的"反推 + 恒 fail"行为。
+HOST_ONLY_REFS = True       # v4.3 默认开启；--drafts-in-refs 关闭
+LEGACY_BOOK_CHECKS = False  # v4.3 默认关闭；--legacy-book-checks 打开
+BOOK_BASE_OVERRIDE = None
+
+
+def _is_host_skill(sp):
+    """技能路径是否位于某工作区的 `.dsh/skills/` 下（= 引擎真正加载的那类技能）。"""
+    parts = os.path.abspath(sp).split(os.sep)
+    return '.dsh' in parts and 'skills' in parts and parts.index('.dsh') < parts.index('skills')
+
+
+def _auto_book_base(slug):
+    """按 slug 在蒸馏树里反查原书册根（排除 snapshots/备份），找不到返回 None。"""
+    hits = []
+    for cand in _g.glob(os.path.join(BASE_DIR, '投资蒸馏', '**', 'skills', slug, 'SKILL.md'), recursive=True):
+        if 'snapshots' in cand or '备份' in cand:
+            continue
+        hits.append(cand)
+    if not hits:
+        return None
+    hits.sort(key=len)
+    return os.path.dirname(os.path.dirname(os.path.dirname(hits[0])))
+
+def _host_skills_root(sp):
+    r"""v4.4（2026-09-13）：从被检文件路径反推它所属的**宿主技能根**（取代硬编码金融宿主）。
+
+    形状 `…\<宿主>\.dsh\skills\<slug>\SKILL.md` → 返回 `…\<宿主>\.dsh\skills`；
+    形状不符（非宿主技能）→ 返回 None，调用方回落到旧常量，保持向后兼容。
+    修因：旧版把"宿主实存集合"写死成金融投资宿主，对教育线 22 件造成 16 件 `d6-c1` **假扣分**。
+    """
+    parts = os.path.abspath(sp).split(os.sep)
+    for i in range(len(parts) - 1, 0, -1):
+        if parts[i] == 'skills' and parts[i - 1] == '.dsh':
+            return os.sep.join(parts[:i + 1])
+    return None
 
 # ----------------------------- 工具 -----------------------------
 
@@ -216,6 +275,21 @@ def check_d2(lines):
         elif cur_step is not None:
             cur_txt.append(lines[i])
     flush_step()
+    # v0.2 修正（M5）：d2-c2 原只数 输入/动作/输出/出口 的词频，会把正文里出现的同名词也算进去。
+    # 现按**步骤块**统计字段覆盖，并回填证据；仅在覆盖不全时把该检查升级为 warn（不改变 pass→fail 语义）。
+    cov = {f: sum(1 for _sn, _t in step_rows if f in _t) for f in ("输入", "动作", "输出", "出口")}
+    n_steps = len(step_rows)
+    for _c in checks:
+        if _c["id"] == "d2-c2":
+            _c["evidence"] = [{"line": start + 1,
+                               "text": "per_step_field_coverage=%s of %d steps; io_word_counts=%s"
+                                       % (json.dumps(cov, ensure_ascii=False), n_steps, json.dumps(io, ensure_ascii=False))}]
+            _miss_field = [f for f, n in cov.items() if n < n_steps]
+            if _miss_field and _c["status"] == "pass":
+                _c["status"] = "warn"
+                _c["note"] = "字段覆盖不全（缺 %s 的步骤存在）；机器只报矩阵，judge 判颗粒度" % "／".join(_miss_field)
+            else:
+                _c["note"] = (_c.get("note") or "") + "（v0.2：按步骤块统计，见 per_step_field_coverage）"
     miss_steps = []
     for sn, txt in step_rows:
         if ("输出" not in txt) or ("出口" not in txt):
@@ -267,7 +341,19 @@ def check_d3(lines):
     return checks, deduct, semantic
 
 def check_d4(lines):
-    n_red = sum(1 for ln in lines if "\U0001F534" in ln)
+    # v0.2 修正（M4）：原把**说明性/历史性**的 🔴（如「（🔴 已修）」「🔴 已登记」）也计入红灯数，
+    # 导致 note 里的 red 数虚高。现分列「全部 🔴 行」与「功能性红灯」，判态仍按功能性计数。
+    _red_lines = [ln for ln in lines if "\U0001F534" in ln]
+    _red_all = len(_red_lines)
+
+    def _functional_red(ln):
+        if re.search(r"（\s*\U0001F534[^）]{0,24}(已修|已登记|历史|原判|曾)", ln):
+            return False
+        if re.search(r"\U0001F534\s*(已修|已登记|已消解)", ln):
+            return False
+        return True
+
+    n_red = sum(1 for ln in _red_lines if _functional_red(ln))
     n_ck = sum(1 for ln in lines if re.search(r"CHECKPOINT|STOP", ln))
     n_confirm = count_in(lines, 0, len(lines), r"确认|呈请")
     checks, deduct = [], 0
@@ -275,7 +361,8 @@ def check_d4(lines):
         ev = hits(lines, 0, len(lines), "\U0001F534" + r"\s*(CHECKPOINT|判停)")
         checks.append({"id": "d4-c1", "rule": "显性检查点标记 🔴/STOP/CHECKPOINT 存在（rubric: 仅'如果...建议'不算）",
                        "status": "pass", "evidence": ev[:4], "deduct": 0,
-                       "note": "red=%d ck=%d" % (n_red, n_ck)})
+                       "note": "red_functional=%d ck=%d（全部 🔴 行 %d，已排除说明/历史标注 %d）"
+                               % (n_red, n_ck, _red_all, _red_all - n_red)})
     else:
         checks.append({"id": "d4-c1", "rule": "显性检查点标记 🔴/STOP/CHECKPOINT 存在",
                        "status": "fail", "evidence": [], "deduct": 4,
@@ -327,18 +414,32 @@ def check_d6(lines, meta, skill_path):
     checks, deduct = [], 0
     sp = os.path.abspath(skill_path)
     parts = sp.split(os.sep)
+    slug_self = os.path.basename(os.path.dirname(sp))
+    host_skill = _is_host_skill(sp)          # v4.3：区分"宿主技能"与"书册原稿技能"
     book_base = None
-    if "skills" in parts:
+    book_source = ""
+    if BOOK_BASE_OVERRIDE:
+        book_base, book_source = BOOK_BASE_OVERRIDE, "override"
+    elif host_skill and not LEGACY_BOOK_CHECKS:
+        book_base = _auto_book_base(slug_self)
+        book_source = "auto" if book_base else "none"
+    elif "skills" in parts:
         idx = parts.index("skills")
         book_base = os.sep.join(parts[:idx])
+        book_source = "derived"
     rel = meta.get("related_skills", "")
     slugs = sorted(set(re.findall(r"[a-z][a-z0-9-]+", rel)))
     slugs = [s for s in slugs if s not in ("skills", "slug") and len(s) > 2]  # v3.5: "slug" 为 YAML 注释元词，误提→d6-c1 假阳性
     found = set()
-    for cand in _g.glob(os.path.join(BASE_DIR, "投资蒸馏", "**", "skills", "*", "SKILL.md"), recursive=True):
-        found.add(os.path.basename(os.path.dirname(cand)))
+    # v4.3 默认：宿主技能的"实存集合"不含原稿副本（引擎不加载原稿树；含进去会漏判归档死链）
+    _skip_drafts = HOST_ONLY_REFS and host_skill
+    if not _skip_drafts:
+        for cand in _g.glob(os.path.join(BASE_DIR, "投资蒸馏", "**", "skills", "*", "SKILL.md"), recursive=True):
+            found.add(os.path.basename(os.path.dirname(cand)))
     # v4.1 补丁(2026-09-12)：宿主技能目录并入 found，消除"投资家族占位"注释依赖（backward-compatible）
-    host_skills = os.path.join(os.path.dirname(BASE_DIR), "金融投资", ".dsh", "skills")
+    # v4.4（2026-09-13）：宿主技能根改为**从被检文件反推**（修"硬编码金融宿主"缺陷）；
+    #   反推不到才回落到旧常量（旧行为不变，仅非宿主技能才会走到回落）。
+    host_skills = _host_skills_root(sp) or os.path.join(os.path.dirname(BASE_DIR), "金融投资", ".dsh", "skills")
     if os.path.isdir(host_skills):
         for _n in os.listdir(host_skills):
             if os.path.isdir(os.path.join(host_skills, _n)):
@@ -367,6 +468,18 @@ def check_d6(lines, meta, skill_path):
     for i, ln in enumerate(lines):
         for m in POOL_FILE_RE.finditer(ln):
             refs.append({"line": i + 1, "ref": m.group(0)})
+    # v4.3：宿主技能查不到原书册根时（如宿主原创技能），池类检查无法定位 candidates/ →
+    #        发 skip（deduct 0），不再像旧口径那样"用错误路径恒报 fail"。
+    skip_book_checks = (book_base is None) and host_skill and not LEGACY_BOOK_CHECKS
+    if skip_book_checks:
+        checks.append({"id": "d6-c2", "rule": "文本内 candidates/*.md 引用可达", "status": "skip",
+                       "evidence": refs[:3], "deduct": 0,
+                       "note": "宿主技能且无书册根（book_base=none）→ 无法定位 candidates/，跳过；"
+                               "如已知原书册根，用 --book-base <dir> 复核"})
+        checks.append({"id": "d6-c3", "rule": "池代号族均有对应池文件", "status": "skip", "evidence": [], "deduct": 0,
+                       "note": "同上，跳过（旧口径在宿主技能上恒 fail，属结构性假阳性）"})
+        checks.append({"id": "d6-c5", "rule": "池 id 在对应池文件内实存", "status": "skip", "evidence": [], "deduct": 0,
+                       "note": "同上，跳过"})
     bad_refs = []
     if book_base:
         for r in refs:
@@ -391,19 +504,20 @@ def check_d6(lines, meta, skill_path):
                 fam_on_disk.add(fam)
     missing_file = sorted(fam_used - fam_on_disk)      # 真缺陷：用了族但池文件不存在
     inline_missing = sorted(fam_on_disk - fam_mapped)  # 文件在但文本没明文引用(▲级)
-    if refs:
-        checks.append({"id": "d6-c2", "rule": "文本内 candidates/*.md 引用可达", "status": "fail" if bad_refs else "pass",
-                       "evidence": refs[:5], "deduct": len(bad_refs),
-                       "note": "bad_refs=" + ",".join(r["ref"] for r in bad_refs)})
-        deduct += len(bad_refs)
-    if missing_file:
-        checks.append({"id": "d6-c3", "rule": "池代号族均有对应池文件(磁盘自动发现)", "status": "fail",
-                       "evidence": refs[:5], "deduct": len(missing_file),
-                       "note": "missing_file=" + ",".join(missing_file) + "；池文件不存在，id 无法实存核验"})
-        deduct += len(missing_file)
-    else:
-        checks.append({"id": "d6-c3", "rule": "池代号族均有对应池文件", "status": "pass", "evidence": [], "deduct": 0,
-                       "note": ("内联映射缺但文件在: " + ",".join(inline_missing)) if inline_missing else ""})
+    if not skip_book_checks:
+        if refs:
+            checks.append({"id": "d6-c2", "rule": "文本内 candidates/*.md 引用可达", "status": "fail" if bad_refs else "pass",
+                           "evidence": refs[:5], "deduct": len(bad_refs),
+                           "note": "bad_refs=" + ",".join(r["ref"] for r in bad_refs)})
+            deduct += len(bad_refs)
+        if missing_file:
+            checks.append({"id": "d6-c3", "rule": "池代号族均有对应池文件(磁盘自动发现)", "status": "fail",
+                           "evidence": refs[:5], "deduct": len(missing_file),
+                           "note": "missing_file=" + ",".join(missing_file) + "；池文件不存在，id 无法实存核验"})
+            deduct += len(missing_file)
+        else:
+            checks.append({"id": "d6-c3", "rule": "池代号族均有对应池文件", "status": "pass", "evidence": [], "deduct": 0,
+                           "note": ("内联映射缺但文件在: " + ",".join(inline_missing)) if inline_missing else ""})
     # c5 池 id 实存核验（v2 新增：按家族约定文件自动发现，SKILL 引用 id 是否在池文件内存在）
     id_report = []
     if book_base:
@@ -423,7 +537,7 @@ def check_d6(lines, meta, skill_path):
             used_ids = set(int(m.group(1)) for m in srx.finditer("\n".join(lines)))
             miss = sorted(used_ids - pool_ids)
             id_report.append({"family": fam, "file": fn, "file_exists": True, "used": len(used_ids), "missing_ids": miss})
-    if id_report:
+    if id_report and not skip_book_checks:
         bad = [x for x in id_report if not x["file_exists"] or x["missing_ids"]]
         checks.append({"id": "d6-c5", "rule": "池 id 在对应池文件内实存（自动发现族文件，v2 新增）",
                        "status": "fail" if bad else "pass",
@@ -431,16 +545,41 @@ def check_d6(lines, meta, skill_path):
                        "deduct": 0,
                        "note": "缺 id 或文件缺失: " + ("无" if not bad else str(bad))})
     # c4 家族路由实存核验（信息性：trv judge 卡曾称投资家族路由"全库不存在"，实存于其他册）
-    fam_locs = {}
-    for cand in _g.glob(os.path.join(BASE_DIR, "投资蒸馏", "**", "skills", "*", "SKILL.md"), recursive=True):
-        s = os.path.basename(os.path.dirname(cand))
-        if s in ("trader-discipline", "fund-selector", "investing-mindset"):
-            fam_locs.setdefault(s, []).append(os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(cand)))))
-    if fam_locs:
-        txt = "; ".join("%s@%s" % (k, ",".join(v)) for k, v in sorted(fam_locs.items()))
-        checks.append({"id": "d6-c4", "rule": "家族路由实存核验（信息性）", "status": "pass",
-                       "evidence": [], "deduct": 0,
-                       "note": "实存=" + txt + "；judge 若称全库不存在则与磁盘不符（口径疑为单册内）"})
+    # v0.2 修正（M8）：原版对「家族路由实存」只硬编码核验 3 个 slug 并自认口径不确定。
+    # 现改为：解析本技能 frontmatter.related_skills 与正文 `反引号 slug`，对**全部被引用 slug**核验
+    #   —— 在三处搜索：蒸馏树 skills ∪ 宿主一级 skills ∪ 宿主 archived（不可加载者单列）。
+    _doc = "\n".join(lines)
+    _refs = set()
+    _m = re.search(r"related_skills:\s*\[(.*?)\]", _doc, re.S)
+    if _m:
+        for x in re.split(r"[,\n]", _m.group(1)):
+            x = re.sub(r"[（(].*?[）)]", "", x).strip().strip('"').strip("'")
+            if x and "-" in x:
+                _refs.add(x)
+    for x in re.findall(r"`([a-z][a-z0-9]*(?:-[a-z0-9]+)+)`", _doc):
+        _refs.add(x)
+    _tree, _host, _arch = set(), set(), set()
+    for _p in _g.glob(os.path.join(BASE_DIR, "投资蒸馏", "*", "skills", "*")):
+        if os.path.isdir(_p):
+            _tree.add(os.path.basename(_p))
+    # v4.4（2026-09-13）：同上，改为从被检文件反推宿主技能根（回落常量保持旧行为）。
+    _hroot = _host_skills_root(skill_path) or r"D:\deepseekharness\workspaces\金融投资\.dsh\skills"
+    if os.path.isdir(_hroot):
+        _host = {d for d in os.listdir(_hroot) if os.path.isdir(os.path.join(_hroot, d))}
+        _ap = os.path.join(_hroot, "archived")
+        if os.path.isdir(_ap):
+            _arch = {d for d in os.listdir(_ap) if os.path.isdir(os.path.join(_ap, d))}
+    _miss = sorted(x for x in _refs if x not in _tree and x not in _host)
+    _arch_only = sorted(x for x in _miss if x in _arch)
+    _real_miss = sorted(x for x in _miss if x not in _arch)
+    checks.append({"id": "d6-c4", "rule": "本技能引用的全部 slug 实存核验（树 ∪ 宿主 ∪ 宿主 archived）",
+                   "status": "pass" if not _real_miss else "warn",
+                   "evidence": [{"line": 1, "text": json.dumps({"referenced": len(_refs), "real_missing": _real_miss,
+                                                                "archived_only": _arch_only}, ensure_ascii=False)}],
+                   "deduct": 0,
+                   "note": "引用 %d 个 slug；真缺 %d；仅存在于宿主 archived（引擎只扫一级子目录→不可加载）%d%s"
+                           % (len(_refs), len(_real_miss), len(_arch_only),
+                              ("；真缺清单=" + ",".join(_real_miss)) if _real_miss else "")})
     semantic = ["'代号生态真实可达但粒度不够直接可达'的行文判断（judge 语义）", "家族式简写路径约定是否可接受"]
     return checks, min(deduct, 3), semantic
 
@@ -500,15 +639,19 @@ def check_d7(lines):
 def check_d9(lines):
     checks, deduct = [], 0
     seg_b4 = find_section(lines, r"^###\s*B4")
-    ev_b4 = []
+    ev_b4, n_dash, n_num = [], 0, 0
     if seg_b4:
-        ev_b4 = hits(lines, seg_b4[0], seg_b4[1], r"^-")
+        # v0.2 修正（M2）：原只数 "- " 项目符号，本册 B4 用「1. 2. 3.」编号项 → 误报 0 条。现兼容两种。
+        ev_b4 = hits(lines, seg_b4[0], seg_b4[1], r"^\s*(-|\d+\.)\s")
+        n_dash = count_in(lines, seg_b4[0], seg_b4[1], r"^\s*-\s")
+        n_num = count_in(lines, seg_b4[0], seg_b4[1], r"^\s*\d+\.\s")
     has_speed = any("判停速查" in ln for ln in lines)
     has_b3 = find_section(lines, r"^###\s*B3") is not None
     has_nodo = any(("不要做" in ln or "反例" in ln) for ln in lines)
     if seg_b4 and has_nodo:
         checks.append({"id": "d9-c1", "rule": "独立'不要做'反例章(B4/反例池)存在", "status": "pass",
-                       "evidence": ev_b4[:5], "deduct": 0, "note": "B4 反例条数=%d" % len(ev_b4)})
+                       "evidence": ev_b4[:5], "deduct": 0,
+                       "note": "B4 反例条数=%d（- 项 %d ＋ 编号项 %d）" % (len(ev_b4), n_dash, n_num)})
     else:
         checks.append({"id": "d9-c1", "rule": "独立'不要做'反例章存在（rubric: 只写正向扣>=3）", "status": "fail",
                        "evidence": [], "deduct": 3, "note": "未命中 B4/反例"})
@@ -562,12 +705,25 @@ def run(skill_path):
     skill_dir = os.path.dirname(os.path.abspath(skill_path))
     tp = {"exists": False}
     tp_path = os.path.join(skill_dir, "test-prompts.json")
+    # v0.2（M6）：并报**册级** test-prompts（技能目录的同级 skills/test-prompts.json），
+    # 避免「逐技能 10+10+9=29」与「册级 18 探针」被当成同一产物而口径混淆。
+    _book_tp = os.path.join(os.path.dirname(skill_dir), "test-prompts.json")
+    _book_tp_info = None
+    if os.path.isfile(_book_tp):
+        try:
+            _bd = json.load(open(_book_tp, encoding="utf-8"))
+            _n = len(_bd.get("probes", [])) if isinstance(_bd, dict) else (len(_bd) if isinstance(_bd, list) else None)
+            _book_tp_info = {"file": "skills/test-prompts.json", "count": _n,
+                             "note": "册级路由盲测集（与逐技能测试集为两个不同产物）"}
+        except Exception as _e:
+            _book_tp_info = {"file": "skills/test-prompts.json", "error": str(_e)[:60]}
     if os.path.isfile(tp_path):
         try:
             with open(tp_path, encoding="utf-8") as fh:
                 _d = json.load(fh)
             ids = [str(x.get("id")) for x in _d if isinstance(x, dict) and "id" in x]
-            tp = {"exists": True, "count": len(_d) if isinstance(_d, list) else None, "ids": ids[:16]}
+            tp = {"exists": True, "count": len(_d) if isinstance(_d, list) else None, "ids": ids[:16],
+                  "scope": "skill_dir（逐技能测试集）", "book_level": _book_tp_info}
         except Exception as exc:
             tp = {"exists": True, "parse_error": str(exc)}
     rt = [{"line": i + 1, "text": ln.strip()[:100]} for i, ln in enumerate(lines) if RT_RX.search(ln)]
@@ -589,9 +745,19 @@ def run(skill_path):
     return report
 
 def main():
+    global HOST_ONLY_REFS, BOOK_BASE_OVERRIDE, LEGACY_BOOK_CHECKS
     if len(sys.argv) < 2:
-        print("usage: python machine_precheck_v1.py <SKILL.md> [--out out.json]")
+        print("usage: python machine_precheck_v2.py <SKILL.md> [--out out.json] "
+              "[--book-base <该书册根目录>] [--drafts-in-refs] [--legacy-book-checks]")
         sys.exit(2)
+    if "--drafts-in-refs" in sys.argv:          # 复现 v4.2 之前的 d6-c1 旧口径
+        HOST_ONLY_REFS = False
+    if "--legacy-book-checks" in sys.argv:      # 复现 v4.2 之前的 d6-c2/c3/c5 旧口径
+        LEGACY_BOOK_CHECKS = True
+    if "--host-only-refs" in sys.argv:          # v4.2 兼容开关（现已是默认）
+        HOST_ONLY_REFS = True
+    if "--book-base" in sys.argv:
+        BOOK_BASE_OVERRIDE = sys.argv[sys.argv.index("--book-base") + 1]
     skill_path = sys.argv[1]
     report = run(skill_path)
     out = None

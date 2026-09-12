@@ -1,8 +1,27 @@
 {
   "name": "dsh-distillation-director",
-  "version": "4.1.0",
-  "license": "AGPL-3.0",
-  "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.1 三闸门禁制）",
+  "version": "4.2.0",
+  "license": "AGPL-3.0-or-later",
+  "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.2：V4.1 三闸门禁制 + §17 工程纪律与装机/上架 9 条）",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "agent-skill",
+    "agent-skills",
+    "distillation",
+    "knowledge-distillation",
+    "book-distillation",
+    "skill-generator"
+  ],
+  "author": "winsonpong98-cloud",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/winsonpong98-cloud/dsh-distillation-director.git"
+  },
+  "homepage": "https://github.com/winsonpong98-cloud/dsh-distillation-director#readme",
+  "bugs": {
+    "url": "https://github.com/winsonpong98-cloud/dsh-distillation-director/issues"
+  },
   "type": "module",
   "main": "./index.js",
   "exports": {

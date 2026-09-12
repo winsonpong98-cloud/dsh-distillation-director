@@ -25,22 +25,60 @@ def check(skill_path, bookbase):
     quotes = "「" in text or "“" in text
     # fidelity 源：册根 parts/ocr 等
     srcs = []
-    if os.path.isdir(bookbase):
+    # v0.2b：优先只取 <bookbase>/parts/ 下的正文源；并排除 *check* 等副本目录（原版把 parts-check 也计入 → 页数翻倍）
+    pref = os.path.join(bookbase, "parts") if bookbase else ""
+    if pref and os.path.isdir(pref):
+        for fn in sorted(os.listdir(pref)):
+            if fn.endswith((".md", ".txt")):
+                srcs.append(os.path.join(pref, fn))
+    elif os.path.isdir(bookbase):
         for root, dirs, files in os.walk(bookbase):
+            if any(k in os.path.basename(root).lower() for k in ("check", "backup", "backups")):
+                continue
             for fn in files:
                 if fn.endswith((".md", ".txt")) and ("part" in fn.lower() or "ocr" in fn.lower() or "ch" in fn.lower()):
                     srcs.append(os.path.join(root, fn))
     r_quotes = len(re.findall(r"「[^」]+」", text.split("## I")[0] if "## I" in text else text))
+    # v0.2（M7）：原版本闸只给 True/False 与 missing=[]，属**自证式清单**、无可核计数。
+    # 现为每闸输出**可核计数**（desc 长度/触发词数、R 段条数、引号与页锚计数、原文页数、步骤与 CHECKPOINT 数），
+    # 并在结论中明确“本检查只判最小输入齐备度，不替代任何真实闸”。
+    _desc = re.search(r'^description:\s*[|"\'](.*?)(?:"\s*$|\n\S)', text, re.M | re.S)
+    _desc_txt = _desc.group(1) if _desc else ""
+    n_pages = 0
+    for _sp in srcs:
+        try:
+            n_pages += len(re.findall(r"=====\s*\[PAGE \d+\]\s*=====", open(_sp, encoding="utf-8").read()))
+        except Exception:
+            pass
+    counts = {
+        "desc_chars": len(_desc_txt),
+        "trigger_keywords": len(re.findall(r"[、，/／]", _desc_txt[_desc_txt.find("触发词"):])) if "触发词" in _desc_txt else 0,
+        "R_quote_lines": len(re.findall(r"^\s*-\s*(?:R\d+|「)", text, re.M)),
+        "quote_pairs": len(re.findall(r"「[^」]{4,}」", text)),
+        "page_anchors": len(re.findall(r"〔p\d+", text)),
+        "source_md_files": len(srcs), "source_pages": n_pages,
+        "E_steps": len(set(re.findall(r"步骤\s*(\d)", text))),
+        "checkpoints": len(re.findall(r"CHECKPOINT", text)),
+    }
+
+    def _g(applicable, missing, note):
+        return {"applicable": bool(applicable), "missing": [] if applicable else missing,
+                "input_note": note, "counts": counts}
+
     gates = {
-        "blind-lexicon": {"applicable": meta_ok, "missing": [] if meta_ok else ["description 缺 何时用/触发词 标记"], "input_note": "词表取自 description，构造即产出"},
-        "defense3": {"applicable": has_R and quotes, "missing": [] if (has_R and quotes) else ["无 R 段或无引号引用形态"], "input_note": "冒充扫描需 R 段边界与引号/条款锚形态"},
-        "darwin": {"applicable": has_R and has_I and has_E and has_B, "missing": [] if (has_R and has_I and has_E and has_B) else ["缺 R/I/E/B 分节之一"], "input_note": "9 维初评需 RIA 分节与 description"},
-        "fidelity-R": {"applicable": bool(srcs) and has_R and r_quotes > 0, "missing": ([] if srcs else ["册根无可核对原文(parts/ocr)"]) + ([] if r_quotes > 0 else ["R 段无引文"]), "input_note": "R 引文逐字需册根原文；池式资产可选强化"},
+        "blind-lexicon": _g(meta_ok, ["description 缺 何时用/触发词 标记"], "词表取自 description（desc 长度与触发词数见 counts）"),
+        "defense3": _g(has_R and quotes, ["无 R 段或无引号引用形态"], "冒充扫描需 R 段边界与引号/页锚形态（R 行数与引号对见 counts）"),
+        "darwin": _g(has_R and has_I and has_E and has_B, ["缺 R/I/E/B 分节之一"], "9 维初评需 RIA 分节与 description"),
+        "fidelity-R": _g(bool(srcs) and has_R and r_quotes > 0,
+                         ([] if srcs else ["册根无可核对原文(parts/ocr)"]) + ([] if r_quotes > 0 else ["R 段无引文"]),
+                         "R 引文逐字需册根原文（源文件数与页标记数见 counts）"),
     }
     return {"skill": os.path.abspath(skill_path), "bookbase": os.path.abspath(bookbase) if bookbase else None,
-            "gates": gates,
-            "recommendation": "machine-ok（四闸最小输入齐备）" if all(g["applicable"] for g in gates.values())
-            else "partial-degrade（不适用闸按 v2.3 全 LLM 并标 pending；其余闸照跑机器层）"}
+            "gates": gates, "counts": counts,
+            "recommendation": ("machine-ok（四闸最小输入齐备；**本检查只判最小输入齐备度，不替代任何真实闸**）"
+                               if all(g["applicable"] for g in gates.values())
+                               else "partial-degrade（不适用闸按 v2.3 全 LLM 并标 pending；其余闸照跑机器层）"),
+            "method_note": "v0.2（M7 修正）：由‘清单式自证’升级为**可核计数**（desc/R/引号/页锚/原文源与页数/步骤/检查点），计数随本文件落盘可复核。"}
 
 def main():
     if len(sys.argv) < 3:
