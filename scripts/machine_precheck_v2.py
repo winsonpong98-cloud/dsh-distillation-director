@@ -40,6 +40,18 @@ import sys
 import json
 import glob as _g
 
+# --- UTF-8 输出保护（甲-A5 严格版 · 2026-09-13 加入；坑 P-16）---
+# 本块由 utf8_guard_patch.py 幂等插入，勿手删：GBK 控制台下打印 ✔ 会抛
+# UnicodeEncodeError → 退出码非 0 的**假报警**（前面所有闸其实都过了）。
+if os.environ.get('PYTHONIOENCODING', '').lower() != 'utf-8':
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
+try:
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+except Exception:
+    pass
+# --- UTF-8 输出保护 结束 ---
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # 蒸馏工作区
 
 # ------------------- v4.3 默认口径（由 v4.2 的 opt-in 提升为默认；可显式回退） -------------------

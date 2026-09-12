@@ -1,8 +1,8 @@
 {
   "name": "dsh-distillation-director",
-  "version": "4.2.1",
+  "version": "4.2.2",
   "license": "AGPL-3.0-or-later",
-  "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.2：V4.1 三闸门禁制 + §17 工程纪律与装机/上架 9 条）",
+  "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.3：V4.1 三闸门禁制 + §17 工程纪律与装机/上架 9 条 + §18 防坑体系与门禁：37 条避坑手册 + 四件门禁 + §九 发行类 + §十 交付与台账纪律）",
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
