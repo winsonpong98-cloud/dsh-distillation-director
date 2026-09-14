@@ -35,7 +35,23 @@ def quote_char_count(line):
     return sum(1 for ch in line if ch in "“”「」")
 
 
+# ⚠ 自伤 A-38（2026-09-13 · 由独立判官指出后自查确证）：
+#   旧实现把"页锚"硬编码为投资线的 `（p数字）` 形态（`has_page_anchor` 找 `（p`；
+#   `tight_trail` 要求窗口内同时出现 `〔` 与 `（p`）。本线（书籍蒸馏）的锚写作
+#   `【Barkley 第2章, PDF p306】`，**一个都不匹配** ⇒ 每条引文一律被判"引号后无紧邻页锚"
+#   ⇒ **suspects 恒为 0，与内容无关**（＝恒空转的闸，不是已通过的闸）。
+#   修法：锚形态表化（含本线形态）＋ 正样本对照（见 selftest 的 `PDF p` 用例）。
+ANCHOR_PATTERNS = [
+    r'〔[^〕]{0,40}（p\s*\d',        # 投资线：〔…（p7）〕
+    r'【[^】]{0,80}PDF\s*p\s*\d',    # 书籍线：【Barkley 第2章, PDF p306】
+    r'\[[^\]]{0,80}PDF\s*p\s*\d',   # 变体：[bark PDF p84]
+]
+
+
 def has_page_anchor(line):
+    for pat in ANCHOR_PATTERNS:
+        if re.search(pat, line):
+            return True
     i = line.find("（p")
     if i < 0:
         return False
@@ -43,6 +59,12 @@ def has_page_anchor(line):
     while j < len(line) and (line[j].isdigit() or line[j] in "-–~，"):
         j += 1
     return any(c.isdigit() for c in line[i:j])
+
+
+def anchor_in_window(ln, start, width):
+    """引号之后 width 字窗口内是否出现任一形态的页锚（A-38 修：形态表化，不再写死 `〔…（p）〕`）。"""
+    win = ln[start:start + width]
+    return has_page_anchor(win)
 
 
 def quoted_runs(line):
@@ -85,8 +107,8 @@ def scan_line(ln, body, heading):
         punct = any(ch in txt for ch in PUNCT)
         before = ln[max(0, run["start"] - 14):run["start"]]
         labeled = marked(before) or marked(txt[:40])   # v2：后置标签不计（judge ▲旁注口径）
-        window = ln[run["end"] + 1:run["end"] + 32]
-        tight_trail = ("〔" in window) and ("（p" in window)
+        win_start = run["end"] + 1
+        tight_trail = anchor_in_window(ln, win_start, 80)
         suspect = body and tight_trail and not labeled and ((n >= 20) or (n >= 12 and punct))
         recs.append({
             "quote": txt[:80], "quote_len": n, "punct": punct, "labeled": labeled,
@@ -146,6 +168,10 @@ def selftest():
         ("示例-词级短引（应豁免）", "若某方案“98% 置信度安全”适用于个体重复暴露（〔示例·重复风险（p4-5）〕）", False),
         ("示例-带引号后置标签（应命中）", "“某群体绝不吃某种食物、非某群体吃得下”（ca15 压缩转述，〔示例·某案例（p6）〕）", True),
         ("示例-短术语引+页锚（应豁免）", "“平均值掩盖了深度差异”＝均值安全掩盖路径上的深坑（R·〔p7〕）", False),
+        # ---- A-38 正样本对照：书籍线锚形态 `【… PDF pNNN】` 必须被认作页锚 ----
+        ("PDF锚-长引+紧邻锚（应命中）", "作者写道：“必须把规则列成一张清单并且不许有讨价还价余地的做法”【Barkley 第14章, PDF p306】", True),
+        ("PDF锚-转述标注（应豁免）", "该主张为压缩转述：“结束谈话时别把话说死”（转述，【Barkley 第10章, PDF p229】）", False),
+        ("PDF锚-短术语（应豁免）", "“执行功能”一词【Barkley 第2章, PDF p85】", False),
     ]
     results = []
     for name, text, expect in cases:

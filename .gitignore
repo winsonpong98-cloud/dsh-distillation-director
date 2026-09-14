@@ -10,3 +10,8 @@ Thumbs.db
 
 # 打包产物（tgz 不提交，用 GitHub Release 分发）
 *.tgz
+
+# Python 编译产物（2026-09-15 加：曾把 scripts/__pycache__/*.pyc 打进发行包）
+__pycache__/
+*.pyc
+*.pyo

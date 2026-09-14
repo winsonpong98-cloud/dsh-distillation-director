@@ -211,14 +211,22 @@ def check_d1(lines, meta, desc):
     else:
         checks.append({"id": "d1-c2", "rule": "description 字符数 <=1024", "status": "pass",
                        "evidence": [{"line": 3, "text": "desc_len=%d <= 1024" % n}], "deduct": 0, "note": ""})
-    missing = [k for k in ["何时用", "触发词"] if k not in desc]
+    # d1-c3 标记词判据（口径修正 2026-09-13 · 同族坑 A-04「判据词表漏一种写法＝整族假警报」）：
+    #   旧写法只认字面子串 "何时用"，而本线 desc 写的是 **「何时不用」**（让位段）——「何时不用」不含子串「何时用」，
+    #   于是两件技能恒报 missing=何时用（独立判官判为**工装假阳**：让位段正是完成"可路由性"的声明）。
+    #   新口径＝「何时用」**家族**（何时用／何时不用／让位／缺省优先 任一命中即算标记段在）；
+    #   **「触发词」仍为独立必需项**，不得用家族扩项替代。
+    MARK_USAGE = ["何时用", "何时不用", "让位", "缺省优先"]
+    missing = ([] if any(k in desc for k in MARK_USAGE) else ["何时用(家族)"])
+    if "触发词" not in desc:
+        missing.append("触发词")
     if missing:
-        checks.append({"id": "d1-c3", "rule": "description 含标记词:何时用/触发词", "status": "warn",
+        checks.append({"id": "d1-c3", "rule": "description 含标记词:何时用(家族)/触发词", "status": "warn",
                        "evidence": [{"line": 3, "text": "missing=" + ",".join(missing)}], "deduct": 0,
                        "note": "标记词缺失=语义存疑交 judge；机器不判'做什么'含金量"})
     else:
-        checks.append({"id": "d1-c3", "rule": "description 含标记词:何时用/触发词", "status": "pass",
-                       "evidence": [{"line": 3, "text": "含 何时用/触发词 标记"}], "deduct": 0, "note": ""})
+        checks.append({"id": "d1-c3", "rule": "description 含标记词:何时用(家族)/触发词", "status": "pass",
+                       "evidence": [{"line": 3, "text": "含 何时用(家族)/触发词 标记"}], "deduct": 0, "note": ""})
     tail = desc[-30:] if desc else ""
     bad_tail = [w for w in EMPTY_TAIL if w in tail]
     if bad_tail:

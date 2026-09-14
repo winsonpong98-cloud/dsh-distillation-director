@@ -1,0 +1,13 @@
+# .gitattributes —— 发行件字节保真（2026-09-15 加）
+#
+# 为什么需要它（实测证据，非推测）：
+#   本机 `core.autocrlf=true`（git 全局默认）⇒ git 在入索引时会把 CRLF 规范化成 LF。
+#   实测 v4.6.4 提交后：`scripts/machine_precheck_v2.py` 工作区 md5 bc20a5ea… / 46,478 B，
+#   而 git 索引 blob md5 b1397a45… / 45,684 B（差 794 B＝794 处换行）；
+#   `scripts/machine_layer_readycheck.py` 同样（f2fc1c67… vs 223c1ef2…）。
+#   ⇒ 后果：用 `dsh plugin add github:winsonpong98-cloud/dsh-distillation-director` 直装的人，
+#     拿到的脚本字节 ≠ 发行 tgz 里的字节 ≠ 权威《三闸机器化》基准 md5（门禁比对基准全是 CRLF）。
+#
+# 处置：全部路径禁用行尾转换（`-text`）⇒ 克隆/直装的字节与工作区、与发行 tgz 一致。
+# 注意：本文件只影响"此后入库/检出"；已入库的 LF blob 需 `git add --renormalize .` 重存一次。
+* -text
