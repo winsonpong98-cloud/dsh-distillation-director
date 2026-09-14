@@ -1,8 +1,38 @@
-# distillation-director · 蒸馏主管（V4.3 · 三闸门禁 ＋ 防坑体系）
+# distillation-director · 蒸馏主管（V4.6 · 三闸判态 ＋ §21 强制门禁 ＋ 防坑体系）
 
 把一本书蒸馏成一组可执行的 Agent 技能——**判态制元技能**（权威执行标准）。
 
-不是通用蒸馏框架，而是**专注书籍蒸馏的专科方案**：三闸判态制（防线3 忠实度 / 盲测路由 / 达尔文体检），只判态不打分，门禁 = 零🔴；**外加一套可运行的工程防坑体系**（37 条避坑手册 ＋ 四件门禁脚本 ＋ 发行纪律）。
+不是通用蒸馏框架，而是**专注书籍蒸馏的专科方案**：三闸判态制（防线3 忠实度 / 盲测路由 / 达尔文体检），只判态不打分，门禁 = 零🔴；**外加一套可运行的工程防坑体系**（避坑手册 ＋ 四件门禁 ＋ 发行纪律）。
+
+---
+
+## 30 秒上手
+
+**① 安装**（三条路径任选其一）
+
+```bash
+# A. 从 Release 下载 tgz 后本地装（推荐；字节与作者测过的发行件完全一致）
+dsh plugin add <你下载到的 dsh-distillation-director-v4.6.5.tgz 路径>
+
+# B. 从仓库直装（需要能访问 GitHub；仓库已锁定行尾字节保真）
+dsh plugin --profile web add github:winsonpong98-cloud/dsh-distillation-director
+
+# C. npm 包名直装（**尚未发布到 npm registry**，发布后可用）
+#    dsh plugin add dsh-distillation-director
+```
+
+**② 开一个新会话，说触发词**（任一）
+
+- 「拆书《XXX》」
+- 「蒸馏这本书」
+- 「把 XX 书做成 skill」
+- 「按手册蒸这本书」
+
+**③ 蒸馏任务的第一条命令必须是开工自证闸**（§21 强制门禁，未过不得调用任何子代理／不得 OCR／不得写产物）
+
+```bash
+python tools\gate_start.py --task <你的任务 slug>
+```
 
 ---
 
@@ -27,29 +57,41 @@
 
 ---
 
-## 安装
+## 安装细节
 
-    dsh plugin add <本包路径或 tarball>
+底层 = pnpm 安装 npm 包 + `cordis.patch.yml` 的 insert 条目挂载，DSH 启动时扫描 bundle 自动 apply。
 
-（底层 = pnpm 安装 npm 包 + `cordis.patch.yml` 的 insert 条目挂载，DSH 启动时扫描 bundle 自动 apply）
+- **路径 A（tgz）**：适合离线／内网／要固定字节的场景。Release 页资产即**作者本机双门校验通过的那一份**。
+- **路径 B（仓库直装）**：仓库已加 `.gitattributes`（`* -text`）**禁用 git 行尾转换**，因此克隆／直装得到的字节与发行 tgz 一致（这是被实测修过的坑，见下「发行纪律」）。
+- 三种路径最终都产生同一条挂载配置：
 
-## 使用
+```yaml
+- insert:
+    - id: distillation-director
+      name: dsh-distillation-director
+```
 
-新会话里说：
+**验证装上了**（可选，一条命令看引擎是否真加载）：
 
-- 「拆书《XXX》」
-- 「蒸馏这本书」
-- 「把 XX 书做成 skill」
-- 「按手册蒸这本书」
+```bash
+dsh web --dump-config | findstr /C:"distillation-director"
+```
+
+---
 
 ## 目录结构
 
-    SKILL.md          技能正文（V4.3 权威）
-    index.js          插件壳（注册技能）
-    cordis.patch.yml  挂载配置
-    extractors/       提取器提示词模板
-    scripts/          机器层脚本（precheck / 盲测词表 / 防线3 / readycheck）
-    manual-history/   历史版本手册（v2.0 / v3.0 / V4.0 / V4.1 存档）
+```
+SKILL.md          技能正文（V4.6 权威；§0–§16 基干 ＋ §17–§22 历次增补）
+index.js          插件壳（注册技能）
+cordis.patch.yml  挂载配置
+extractors/       提取器提示词模板
+scripts/          机器层脚本 4 件（machine_precheck_v2 / machine_layer_readycheck /
+                  defense3_impersonation_scan / blindtest_lexicon_mock_v1；全部本地运行、零 API 成本）
+manual-history/   历史版本手册存档（v2.0 / v3.0 / V4.0 / V4.1）
+```
+
+---
 
 ## 版本
 
@@ -58,7 +100,36 @@
 | V4.1 | 2026-09-12 | 红线词分级 + LLM 终裁 / desc 让位分离 / 分段落盘 + 超时判据 / 成本基准 ¥20.5 |
 | v4.2.0 | 2026-09-13 | §17 工程纪律与装机/上架 9 条；补 manual-V4.1；同步 v4.3 机器口径脚本 |
 | v4.2.1 | 2026-09-13 | §18 防坑体系与门禁（33 条避坑手册 + preflight／postflight／gate_selftest + 写入型自检禁令） |
-| **v4.2.2** | **2026-09-13** | **收口轮**：避坑手册 **37 条**（新增 A-11 判官目录时效／A-12 复测并行污染／A-13 spill 只留首尾／A-14 自报 vs 引擎观测）＋ **§九 发行类**＋ **§十 交付与台账纪律**；`postflight` 增 **②-b 余量告警** 与 **④-b 打包产物新鲜度**；`pitfall_audit --check` **深跑只读命令**；权威工具同步（`machine_precheck_v2.py` 本体加 UTF-8 保护） |
+| v4.2.2 | 2026-09-13 | 收口轮：避坑手册 37 条 ＋ §九 发行类 ＋ §十 交付与台账纪律；`postflight` 增 ②-b 余量告警与 ④-b 打包新鲜度 |
+| v4.4.0 | 2026-09-13 | §19 判官工作流 v2 与副本治理（desc 路由工程铁律六条；四层副本模型） |
+| v4.5.0 | 2026-09-13 | §20 底账同代、判官输入工程与闸的升格秩序 |
+| v4.6.0–4.6.2 | 2026-09-13 | §21 **强制门禁**：`gate_start` 开工自证闸 ＋ `gate_stage` 阶段依赖链 ＋ `gate_checklist` 执行单逐项闸；`preflight ⑤` 自动纳入活跃蒸馏任务 |
+| v4.6.3–4.6.4 | 2026-09-14 | §22 判官要求固化：「引文型附属文件」零问题检查表（R1–R8 断言） |
+| **v4.6.5** | **2026-09-15** | **本版**：README 与发行件同步到当前版本；补齐 v4.4.0–v4.6.4 的版本表与三条安装路径；**发行保真两处修复**（打包器剔除 `__pycache__` 编译产物；新增 `.gitattributes` 锁定行尾字节） |
+
+完整手册演进见 `manual-history/` 与技能正文 `SKILL.md` §16–§22。
+
+---
+
+## 发行纪律（本插件自己的纪律，也是可复用的参考）
+
+本插件的每次发行都要过以下闸，且**这些闸自身被坏样本验证过"确实会红"**：
+
+| 闸 | 作用 |
+|---|---|
+| `preflight` / `postflight` | 开工前／改后各一组门禁（YAML、desc 长度、表格、脚本同步、打包产物新鲜度、机器层零新增 fail、可编译……） |
+| `gate_selftest` | 用已知坏样本证明门禁有效（**"不可能失败的门"不算门**） |
+| `pitfall_audit --check` | 避坑手册与工具对账 ＋ 只读命令深跑（防手册腐烂） |
+| 解包级校验 | 两个 tgz 与权威源逐字节一致 ＋ **包内无多余产物**（双向判据） |
+| 端到端可加载 | 对打包产物真 `import` ＋ 模拟注册，确认真能装上（不是"文件都在"） |
+| 三层字节一致 | 工作区 / git 索引 / tgz 三层逐字节相同（防 `core.autocrlf` 静默改写） |
+
+**v4.6.5 修掉的两个发行缺陷**（都出自真实事故，已进避坑手册 `§9.5`）：
+
+1. **脏包**：打包器曾把 `scripts/__pycache__/*.pyc` 打进 tgz（4.6.2／4.6.3／4.6.4 内测件受影响）。修法＝打包器目录级＋后缀级双排除，并给校验器补「包内无多余产物」的黑名单 ＋ 逐件反查**双向**判据。
+2. **字节保真**：`core.autocrlf=true` 曾把脚本在 git 索引里 LF 化，导致**仓库直装的字节 ≠ 发行 tgz 的字节**。修法＝`.gitattributes`（`* -text`）＋ `git add --renormalize .`。
+
+> 纪律两条：**① 所有"该有的在不在"型判据都拦不住"多带了什么"；② 发布完成后必须从公网回读资产、比对 sha256 三方一致，才算发行完成。**
 
 ---
 
@@ -71,4 +142,4 @@
 
 ## 许可证
 
-AGPL-3.0（因 index.js 结构参考了同许可证的 dsh-cangjie-skill）。完整文本见 `LICENSE` 或 <https://www.gnu.org/licenses/agpl-3.0.html>。
+AGPL-3.0-or-later（因 index.js 结构参考了同许可证的 dsh-cangjie-skill）。完整文本见 `LICENSE` 或 <https://www.gnu.org/licenses/agpl-3.0.html>。
