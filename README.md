@@ -104,7 +104,7 @@ cordis.patch.yml  挂载配置
 extractors/       提取器提示词模板
 scripts/          机器层脚本 4 件（machine_precheck_v2 / machine_layer_readycheck /
                   defense3_impersonation_scan / blindtest_lexicon_mock_v1；全部本地运行、零 API 成本）
-manual-history/   历史版本手册存档（v2.0 / v3.0 / V4.0 / V4.1）
+manual-history/   历史版本手册存档（4 件，文件名即如此：manual-v2.0 / manual-v3.0 / manual-V4.0 / manual-V4.1）
 ```
 
 ---
@@ -113,8 +113,8 @@ manual-history/   历史版本手册存档（v2.0 / v3.0 / V4.0 / V4.1）
 
 | 版本 | 日期 | 关键内容 |
 |---|---|---|
-| V4.1 | 2026-09-12 | 红线词分级 + LLM 终裁 / desc 让位分离 / 分段落盘 + 超时判据 / 成本基准 ¥20.5 |
-| v4.2.0 | 2026-09-13 | §17 工程纪律与装机/上架 9 条；补 manual-V4.1；同步 v4.3 机器口径脚本 |
+| v4.1 | 2026-09-12 | 红线词分级 + LLM 终裁 / desc 让位分离 / 分段落盘 + 超时判据 / 成本基准 ¥20.5 |
+| v4.2.0 | 2026-09-13 | §17 工程纪律与装机/上架 9 条；补 manual-V4.1；同步机器层脚本口径（提交信息里写作"v4.3"，**指脚本口径，非插件版本号**） |
 | v4.2.1 | 2026-09-13 | §18 防坑体系与门禁（33 条避坑手册 + preflight／postflight／gate_selftest + 写入型自检禁令） |
 | v4.2.2 | 2026-09-13 | 收口轮：避坑手册 37 条 ＋ §九 发行类 ＋ §十 交付与台账纪律；`postflight` 增 ②-b 余量告警与 ④-b 打包新鲜度 |
 | v4.4.0 | 2026-09-13 | §19 判官工作流 v2 与副本治理（desc 路由工程铁律六条；四层副本模型） |
@@ -125,6 +125,8 @@ manual-history/   历史版本手册存档（v2.0 / v3.0 / V4.0 / V4.1）
 | **v4.6.6** | **2026-09-15** | **本版**：**上架 npm registry**（`dsh plugin add dsh-distillation-director` 一行直装）；README 安装路径更新为**四条**并标注各自适用场景；新增"GitHub Release 固定链接"作为**不依赖 npm 的备用通道** |
 
 > **从哪装最省事**：一条命令 `dsh plugin add dsh-distillation-director`（npm）。**如果你的网络访问 npm 不畅**，用固定链接那条（路径 B），效果完全一样。
+
+> **版本编号说明（v4.3 未独立发布）**：**`v4.3` 是跳过的编号，未独立发版**。v4.2.0 提交信息里的"v4.3"指**机器层脚本口径**、v4.6.4 提交信息里的"V4.3"指**防坑体系批次**，二者均非插件版本号；「防坑体系 37 条 ＋ 三件门禁」实际随 **v4.2.2** 收口轮交付。故编号自 v4.2.2 直接进入 v4.4.0。
 
 完整手册演进见 `manual-history/` 与技能正文 `SKILL.md` §16–§22。
 
