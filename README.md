@@ -8,18 +8,23 @@
 
 ## 30 秒上手
 
-**① 安装**（三条路径任选其一）
+**① 安装**（四条路径任选其一；**前三条都验证过**）
 
 ```bash
-# A. 从 Release 下载 tgz 后本地装（推荐；字节与作者测过的发行件完全一致）
-dsh plugin add <你下载到的 dsh-distillation-director-v4.6.5.tgz 路径>
+# A. npm 一行直装（最省事；已在 npm registry 上架）
+dsh plugin add dsh-distillation-director
 
-# B. 从仓库直装（需要能访问 GitHub；仓库已锁定行尾字节保真）
+# B. 固定链接直装（不需要 npm；永远指向最新版）
+dsh plugin add https://github.com/winsonpong98-cloud/dsh-distillation-director/releases/latest/download/dsh-distillation-director.tgz
+
+# C. 从仓库直装（需要能访问 GitHub；仓库已锁定行尾字节保真）
 dsh plugin --profile web add github:winsonpong98-cloud/dsh-distillation-director
 
-# C. npm 包名直装（**尚未发布到 npm registry**，发布后可用）
-#    dsh plugin add dsh-distillation-director
+# D. 从 Release 页面下载 tgz 后本地装（字节与作者双门校验过的发行件完全一致）
+dsh plugin add <你下载到的 dsh-distillation-director-vX.Y.Z.tgz 路径>
 ```
+
+> 三条远程路径的关系：**A** 走 npm registry（最稳、最短）；**B** 走 GitHub Release 的别名资产（**npm 不可用时的备用通道**，链接永不随版本变化）；**C** 走 git 仓库（仓库已加 `.gitattributes` 锁定行尾字节，保证"直装字节＝发行字节"）。
 
 **② 开一个新会话，说触发词**（任一）
 
@@ -61,9 +66,11 @@ python tools\gate_start.py --task <你的任务 slug>
 
 底层 = pnpm 安装 npm 包 + `cordis.patch.yml` 的 insert 条目挂载，DSH 启动时扫描 bundle 自动 apply。
 
-- **路径 A（tgz）**：适合离线／内网／要固定字节的场景。Release 页资产即**作者本机双门校验通过的那一份**。
-- **路径 B（仓库直装）**：仓库已加 `.gitattributes`（`* -text`）**禁用 git 行尾转换**，因此克隆／直装得到的字节与发行 tgz 一致（这是被实测修过的坑，见下「发行纪律」）。
-- 三种路径最终都产生同一条挂载配置：
+- **路径 A（npm 包名）**：`dsh plugin add dsh-distillation-director`。底层同样走 pnpm，但从 **npm registry** 取包（本包已上架，`latest` 即最新版）。
+- **路径 B（GitHub Release 固定链接）**：别名资产链接**永远指向最新版**，**不需要 npm 也能装**——这是"npm 通道不可用"时的备用通道。
+- **路径 C（仓库直装）**：仓库已加 `.gitattributes`（`* -text`）**禁用 git 行尾转换**，因此克隆／直装得到的字节与发行 tgz 一致（这是被实测修过的坑，见下「发行纪律」）。
+- **路径 D（本地 tgz）**：适合离线／内网／要固定字节的场景。Release 页资产即**作者本机双门校验通过的那一份**。
+- 所有路径最终都产生同一条挂载配置：
 
 ```yaml
 - insert:
@@ -105,7 +112,10 @@ manual-history/   历史版本手册存档（v2.0 / v3.0 / V4.0 / V4.1）
 | v4.5.0 | 2026-09-13 | §20 底账同代、判官输入工程与闸的升格秩序 |
 | v4.6.0–4.6.2 | 2026-09-13 | §21 **强制门禁**：`gate_start` 开工自证闸 ＋ `gate_stage` 阶段依赖链 ＋ `gate_checklist` 执行单逐项闸；`preflight ⑤` 自动纳入活跃蒸馏任务 |
 | v4.6.3–4.6.4 | 2026-09-14 | §22 判官要求固化：「引文型附属文件」零问题检查表（R1–R8 断言） |
-| **v4.6.5** | **2026-09-15** | **本版**：README 与发行件同步到当前版本；补齐 v4.4.0–v4.6.4 的版本表与三条安装路径；**发行保真两处修复**（打包器剔除 `__pycache__` 编译产物；新增 `.gitattributes` 锁定行尾字节） |
+| v4.6.5 | 2026-09-15 | README 与发行件同步到当前版本；补齐 v4.4.0–v4.6.4 的版本表与安装路径；**发行保真两处修复**（打包器剔除 `__pycache__` 编译产物；新增 `.gitattributes` 锁定行尾字节） |
+| **v4.6.6** | **2026-09-15** | **本版**：**上架 npm registry**（`dsh plugin add dsh-distillation-director` 一行直装）；README 安装路径更新为**四条**并标注各自适用场景；新增"GitHub Release 固定链接"作为**不依赖 npm 的备用通道** |
+
+> **从哪装最省事**：一条命令 `dsh plugin add dsh-distillation-director`（npm）。**如果你的网络访问 npm 不畅**，用固定链接那条（路径 B），效果完全一样。
 
 完整手册演进见 `manual-history/` 与技能正文 `SKILL.md` §16–§22。
 

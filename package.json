@@ -1,6 +1,6 @@
 {
   "name": "dsh-distillation-director",
-  "version": "4.6.5",
+  "version": "4.6.6",
   "license": "AGPL-3.0-or-later",
   "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.6：V4.3–V4.5 防坑体系与判官工作流之上，增 §21 **强制门禁**——gate_start 开工自证闸（手册哈希＋条款逐字抄录＋执行单＋机器层＋官方模板）／gate_stage 阶段依赖链（前阶段未过不得进入）／preflight 自动纳入活跃蒸馏任务）",
   "keywords": [
