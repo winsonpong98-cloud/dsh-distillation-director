@@ -88,7 +88,33 @@ def _official_expected_n():
     正解：**项数只有一处权威＝官方模板**；本闸**读它**，并在读不到时**报错而不是回落常量**
     （回落＝静默降级，`A-74`）。
     """
-    tpl = _os_.path.join(ROOT, '投资蒸馏', '三闸机器化', 'V3.1全量执行单.md')
+    # 模板定位解析链（**不得写死书树名**）：cfg.env → <root>/tools（随包那份）→ <root> → book_trees → 旧路径
+    tpl = None
+    _cands = []
+    try:
+        _cands.append((_cfg.checklist_template or '').strip())
+    except Exception:
+        pass
+    _cands.append((os.environ.get('DSH_CHECKLIST_TEMPLATE') or '').strip())
+    _cands.append(os.path.join(ROOT, 'tools', 'V3.1全量执行单.md'))
+    _cands.append(os.path.join(ROOT, 'V3.1全量执行单.md'))
+    try:
+        for _bt in (_cfg.book_trees or []):
+            _cands.append(os.path.join(ROOT, _bt, '三闸机器化', 'V3.1全量执行单.md'))
+    except Exception:
+        pass
+    _cands.append(os.path.join(ROOT, '投资蒸馏', '三闸机器化', 'V3.1全量执行单.md'))
+    for _c in _cands:
+        if _c and os.path.isfile(_c):
+            tpl = _c
+            break
+    if not tpl:
+        print('🔴 找不到《V3.1全量执行单》模板（找过 tools/ 、根目录、book_trees、旧路径）——'
+              '请跑 init_workspace 或用 DSH_CHECKLIST_TEMPLATE 指定')
+        return None, None
+    if not tpl:
+        print('🔴 找不到《V3.1全量执行单》模板（找过：<root>/tools/、<root>/、book_trees、旧路径）——请跑 init_workspace 或用 DSH_CHECKLIST_TEMPLATE 指定')
+        return 1
     if not _os_.path.isfile(tpl):
         return None, tpl
     nums = []

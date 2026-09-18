@@ -64,8 +64,11 @@ def _resolve_root():
              '   ② 写 <工作区>/.dsh/gate-kit/workspace.json 的 workspace_root\n'
              '   ③ 用 DSH_GATE_CONFIG 指向该配置文件')
 ROOT = _resolve_root()
+import os as _b_os, sys as _b_sys          # 单一来源：tools\_bandid.py（A-132）
+_b_sys.path.insert(0, _b_os.path.dirname(_b_os.path.abspath(__file__)))
+import _bandid as BID  # noqa: E402
 POST = os.path.join(ROOT, 'tools', 'postflight.py')
-FACE = re.compile(r'【[^】]{0,120}PDF\s*[pP]|（`[A-Za-z]+-\d{3}`\s*s\d')
+FACE = re.compile(r'【[^】]{0,120}PDF\s*[pP]|（`' + BID.ID + r'`\s*s\d')
 
 
 def has_quote_face(task_dir):

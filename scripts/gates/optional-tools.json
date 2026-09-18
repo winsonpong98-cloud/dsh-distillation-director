@@ -1,5 +1,10 @@
 {
- "_说明": "作者工作台专用脚本，不随包发行；包内门禁引用到它们时按**可选依赖**处理（缺则跳过并打印原因）。",
+ "_说明": "作者工作台专用脚本，不随包发行；包内门禁引用到它们时按**可选依赖**处理（缺则跳过并打印原因）。**本清单是发版闸 D 判据与 repack 闭包的共同契约**——repack 会读到名字就**不装进包**（A-132 同批：两边不同源会让构建端把 `desc_util.py` 这类含作者绝对路径的依赖一起拖进包，A/B 判据当场判红）。",
+ "_已随包（故不再声明为可选，2026-09-19 修正）": [
+  "verify_candidates.py",
+  "verify_layer_quotes.py"
+ ],
+ "_修正理由": "这两件曾因『未随包』被登记为可选；其后 repack 的 SYNC_EXTRA_MODULES 已把它们**真的装进包**（NAS 实测逼出来的补件）。声明与事实相反＝同一事实两个来源（A-04 家族），故从 optional 移出：既然随包，就必须按『包内必须有』校验。",
  "optional": [
   "chardiff.py",
   "deadlink_inventory.py",
@@ -8,8 +13,6 @@
   "fair_regression_all.py",
   "final_acceptance.py",
   "route_overlap_generic.py",
-  "machine_scan_edu.py",
-  "verify_candidates.py",
-  "verify_layer_quotes.py"
+  "machine_scan_edu.py"
  ]
 }

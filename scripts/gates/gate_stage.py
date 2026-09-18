@@ -30,6 +30,7 @@ for _c in (_HERE,
     if _c not in _sys_.path:
         _sys_.path.insert(0, _c)
 from gate_common import cfg as _cfg
+import _bandid as BID          # ← 波段 id 语法的**唯一来源**（A-132，2026-09-19 定案）
 ROOT = _cfg.root
 TOOLS = _cfg.tools
 # ⚠ 三个"工作目录"必须分开（本节自伤登记 · 实测抓出）：
@@ -118,9 +119,11 @@ def check_stage1(work):
         # 形态容错修复（2026-09-17 · manias-crashes 实测自伤）：原式 `[A-Za-z]\d+-\d{3}` 实际要求
         # **波段号前无连字符**（如 `B12-005`），而官方模板/本册产出写的是 `D-001`、`A-001`
         # （连字符在波段号之后）⇒ 该式恒不命中，**阶段1 闸对任何字母波段名书册恒红**（假红）。
-        # 现改为 `[A-Za-z][0-9]*-[0-9]{3}`，两种形态均命中（`D-001` 与 `B12-005`），
-        # 且**不放宽实质**：仍要求 `[类型] [技能=` 两段齐备，自造格式依旧被拦。
-        OFFICIAL = re.compile(r"^###\s+[A-Za-z][0-9]*-[0-9]{3}\s+\[[A-Z]{2}\]\s+\[技能=", re.M)
+        # ⚠ 2026-09-19 二次定案（A-132）：当时的"改法"`[A-Za-z][0-9]*-[0-9]{3}` 仍然只吃
+        #   **单字母＋数字**（`A`／`T1`），**吃不到多字母前缀 `ST-001`**；而下游
+        #   `verify_candidates` 同期用的是 `[A-Za-z]+`（吃不到 `E1-001`）⇒ 同一册一手绿一手红。
+        #   现**一律取自 `tools\_bandid.py`**（波段 id 语法的唯一来源），本文件不再内联该语法。
+        OFFICIAL = BID.TEMPLATE_HEAD
         tot = sum(len(OFFICIAL.findall(open(n, encoding="utf-8", errors="ignore").read())) for n in notes)
         if tot < 5:
             errs.append("官方模板格式条目（`### {band}-NNN [类型] [技能=…]`）合计 %d <5 ⇒ 疑非模板格式产出" % tot)
@@ -144,7 +147,9 @@ def check_stage1(work):
 
     # 加：**波段产出必须齐全** —— 防"只跑一半波段就宣称阶段1 完成"
     if os.path.isdir(pd):
-        bands = [m.group(1) for m in (re.match(r"([A-Za-z]\d+)\.(txt|md)$", f) for f in os.listdir(pd)) if m]
+        # 波段名取值**同一真源**（A-132）：原写 `[A-Za-z]\d+` ⇒ 纯字母波段（manias `A..G`）**全漏**
+        #   ⇒ "波段产出必须齐全"这项闸**对纯字母册恒空转**（漏检比误报致命，A-55 家族）。
+        bands = [m.group(1) for m in (BID.BAND_ONLY.match(f) for f in os.listdir(pd)) if m]
         lack = [b for b in sorted(bands)
                 if not os.path.exists(os.path.join(work, "candidates", "notes_%s.md" % b))]
         if lack:
@@ -164,9 +169,16 @@ def check_stage15(work):
         # A-28 家族加固（2026-09-13 阶段1.5 实测）：原判据只数 `^### ` 与表格行 ⇒ 一份
         # **只有标题没有条目**的 verified.md 也能过（判据被描述性文字命中＝假通过）。
         # 现要求**真含官方格式条目 id**（`### <band>-NNN  [`），与表格行合并计数。
-        # 形态容错同 check_stage1（2026-09-17）：`[A-Za-z]\d+-\d{3}` → `[A-Za-z][0-9]*-[0-9]{3}`
-        # （原式要求连字符在波段号之前，对 `D-001` 形态恒不命中 ⇒ 阶段1.5 亦假红）。
-        n_id = count_lines(p, r"^###\s+[A-Za-z][0-9]*-[0-9]{3}\s+\[")
+        # 形态容错同 check_stage1（2026-09-17／2026-09-19 定案 A-132）：一律取自 `_bandid`
+        # （原式 `[A-Za-z]\d+-\d{3}` 要求连字符在波段号之前，对 `D-001` 形态恒不命中 ⇒ 阶段1.5 亦假红；
+        #   中间那版 `[A-Za-z][0-9]*-[0-9]{3}` 又漏掉多字母前缀 `ST-001`）。
+        # ⚠ 自伤登记（2026-09-19 · NAS 真机当场抓到）：此处首版写 `BID.HEAD.pattern`，
+        #   而 `_bandid.HEAD` 是**字符串**不是已编译对象 ⇒ `AttributeError: 'str' object has
+        #   no attribute 'pattern'` ⇒ **阶段1.5 闸整条崩掉**（本机没跑到该分支，只有真机能抓）。
+        #   另一个坑：`count_lines()` 内部是 `re.findall(pattern, t, re.M)`，**传已编译对象会抛
+        #   ValueError（flags 不能与已编译模式并用）** ⇒ 这里**必须传字符串**。
+        #   **教训：跨机自证不是"锦上添花"，本机测不到的路径只有异机才暴露**（`A-132` 同批）。
+        n_id = count_lines(p, BID.HEAD)
         n = count_lines(p, r"^###\s|^\|\s*\S+\s*\|")
         if n < 5 or n_id < 5:
             errs.append("%s 内容过少（条目 id %d 条 ／ 候选条目+表格行 %d <5）"

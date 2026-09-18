@@ -52,6 +52,12 @@ def sha(p):
 
 
 def main():
+    _host = os.path.dirname(STAMP)
+    if not os.path.isdir(_host):
+        # 真机实测（NAS 2026-09-18）：用户机没有作者的宿主工作区 ⇒ 本闸**判"不适用"**（不是失败）。
+        # 缺件判不适用是本项目一贯口径（A-74／A-115 家族）；出红会把"本机没有别人的目录"误报成缺陷。
+        print('ℹ 判"不适用"：宿主工作区不存在（%s）—— 本闸只对作者侧的副本漂移有意义' % _host)
+        return 0
     if not os.path.isfile(STAMP):
         print('✗ 红线：版本戳不存在（先跑 tools\\make_edu_root_stamp.py）：%s' % STAMP)
         return 1

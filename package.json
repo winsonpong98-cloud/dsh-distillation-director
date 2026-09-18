@@ -1,8 +1,8 @@
 {
  "name": "dsh-distillation-director",
- "version": "4.9.3",
+ "version": "4.9.7",
  "license": "AGPL-3.0-or-later",
- "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.9.3：发行自足与跨平台——§21 **强制门禁**与整套门禁套件（27 件）＋ WORK 配套脚本（4 件）**首次随包发行**；发版闸 A/B/C/D/D-配套/E/F 六判据；node／js-yaml 解析链跨平台；`init_workspace` 一键初始化。§21 **强制门禁**——gate_start 开工自证闸（手册哈希＋条款逐字抄录＋执行单＋机器层＋官方模板）／gate_stage 阶段依赖链（前阶段未过不得进入）／preflight 自动纳入活跃蒸馏任务）",
+ "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.9.7：**判据语法单一来源 ＋ 跨册回归**——2026-09-19 在 NAS 上实测到「同一份**合规**产出在不同仪器下时红时绿」：波段 id 语法被内联写在 17 处、共 4 种残缺写法（`[A-Za-z]+` 吃不到「字母＋数字」波段 `E1`/`T1`），于是 `verify_candidates` 报 🔴 切块为空 而 `gate_stage` 却 ✔；本版建唯一真源 tools/_bandid.py 并回改 17 处，新增单源闸 check_bandid_single_source.py（10 样本自证）挂 postflight ⑬，gate_selftest 增 E1 成对差分样本，空集报错改为「打印期望语法＋实测标题行」，§25 固化三条铁律；避坑手册 v3.7（A-132）)",
  "keywords": [
   "dsh-plugin",
   "deepseek-harness",

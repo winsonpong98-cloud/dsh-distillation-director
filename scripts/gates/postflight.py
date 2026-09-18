@@ -410,6 +410,31 @@ def main():
         ('✔ 可在别人电脑上跑' if m and m.group(1) == '✔' else '🔴 见输出（**不得发布**）'), rc == 0,
         'A 包内无作者路径／B 有可覆盖出口／C 服从 env 根（A-104）')
 
+    # ⑧-g 插件**装机态三层闸**（2026-09-18 挂入 · 只读 · NAS 装机缺陷复盘固化）
+    #   由来（真机实测）：在一台 NAS 的容器里装本插件，**装了但不生效**——`dependencies` 有它、
+    #   `dsh.profile.bundles` 没有它 ⇒ 引擎根本不加载（症状与会话里看不到插件一模一样，但修法完全不同）。
+    #   为什么单列三层：①落盘（文件/声明）②登记（deps＋bundles＋组装树）③在役（服务＋技能根同代），
+    #   三层的失败**症状同、修法不同**；只报"没生效"等于让使用者从零猜。
+    #   口径：本闸带 `--self-test`（坏样本必须被拦）自证有效；作者侧"本机未装插件是常态"时判**不适用**
+    #   （不假绿也不假红，原判照印）。
+    print('\n⑧-g 插件装机态三层闸（只读 · 装机/换机后必跑）')
+    rc, so, se = run([sys.executable, os.path.join(TOOLS, 'check_install_state.py'),
+                      '--not-applicable-ok'])
+    if '判"不适用"' in so:
+        rec('install-state:三层装机态', '三层全过 或 明确不适用（rc=0）',
+            'ℹ 不适用（本机 profile 未装该插件；原判已打印）', True,
+            '①落盘／②登记（deps＋bundles＋组装树）／③在役（服务＋技能根同代）——A-119…A-124')
+    else:
+        m_g = re.search(r'结论：(✔ 三层装机态闸全绿|✗ 三层装机态闸 \d+ 层有真缺陷)', so)
+        rec('install-state:三层装机态', '三层全过（rc=0）',
+            (m_g.group(1) if m_g else '🔴 见输出'), rc == 0,
+            '①落盘／②登记（deps＋bundles＋组装树）／③在役（服务＋技能根同代）——A-119…A-124')
+    # 仪器自证：闸本身必须拦得住坏样本（A-34／A-55：新仪器交付前先过已知坏样本）
+    rc2, so2, _ = run([sys.executable, os.path.join(TOOLS, 'check_install_state.py'), '--self-test'])
+    rec('install-state:自证(A-55)', '坏样本全拦＋好样本全放行（rc=0）',
+        ('✔ 自证通过' if re.search(r'自证通过', so2) else '🔴 见输出'), rc2 == 0,
+        '4 类坏样本（无 dsh.bundle／deps 有 bundles 无／技能根不同代／语法坏）＋2 类好样本')
+
     # ⑨ 门禁工具子模式自检（A-32 脚本化落地 · 2026-09-13 ADHD 线阶段1.5 挂入 · 只读）
     #   依据：A-32 实证——`gate_stage --stage X` 的 docstring 承诺「0 = 该阶段可进入」，
     #   实现却取**全阶段**是否全过 ⇒ 打印「✔ 允许进入」却 rc=1，**拿它当闸用会误判**。
@@ -532,8 +557,39 @@ def main():
         ('🔴 ' + '、'.join(_verhits[:3])) if _verhits else '✔ 0 处',
         not _verhits, 'A-53：写死"最新版号" ⇒ 发新版时给最新版自己盖反向标注（注释内引用不算）')
 
+    # ⑬ 波段 id 语法单一来源（A-132 · 2026-09-19 挂入 · 只读）
+    #   依据（NAS 异机实测 · 活体标本）：册 `cn-pop-2100` 的波段名是 `E1..E6`，产出**完全合规**，
+    #   却被 `verify_candidates` 判「切块为空 ⇒ 条目 0」（假红），而**同一册**在 `gate_stage`
+    #   的格式判据下是绿的 ⇒ **一手绿一手红，判决取决于用哪把尺子**。
+    #   根因：这套语法在工作台里**被内联写了 17 处、共 4 种残缺写法**，而每次"修"都在另一形态上修坏
+    #   （`\d+` 丢纯字母册 → `\d*`/`[0-9]*` 丢双字母前缀 → `+` **丢「字母＋数字」册**）。
+    #   判据：全工作台只许有一份语法（`tools\_bandid.py`）；内联残片 ⇒ 判红。
+    #   同时跑该闸的**自证**（正负样本），防"闸自己失效却报绿"（A-32/A-36 家族）。
+    print('\n⑬ 波段 id 语法单一来源（A-132 · 只读）')
+    _bs = os.path.join(TOOLS, 'check_bandid_single_source.py')
+    if not os.path.exists(_bs):
+        rec('bandid:单一来源(A-132)', '闸在位', '🔴 缺 tools\\check_bandid_single_source.py',
+            False, 'A-132：语法唯一来源闸缺失 ⇒ 内联复发无法拦')
+    else:
+        _rcs, _sos, _ = run([sys.executable, _bs, '--selftest'])
+        _sts = (r'闸自证通过' in _sos)
+        rec('bandid:闸自证(A-132)', '正负样本各就各位（rc=0＋闸自证通过）',
+            ('✔ 自证通过' if _sts and _rcs == 0 else '🔴 见输出'), _sts and _rcs == 0,
+            'A-132：闸必须先证明自己拦得住（含"令牌贴错行不算豁免"这类自身形态）')
+        _rcb, _sob, _ = run([sys.executable, _bs])
+        _bsr = re.search(r'已扫\s*(\d+)\s*个文件', _sob)
+        if re.search(r'未发现内联波段 id 语法', _sob) and _rcb == 0:
+            rec('bandid:零内联(A-132)', '0 处内联（引用唯一真源 tools\\_bandid.py）',
+                '✔ 0 处（扫 %s 个文件）' % (_bsr.group(1) if _bsr else '?'), True,
+                'A-132：语法写两处＝改一处等于没改（本项曾 17 处）')
+        else:
+            _tail = [l.strip() for l in _sob.splitlines() if '🔴' in l][:3]
+            rec('bandid:零内联(A-132)', '0 处内联（引用唯一真源 tools\\_bandid.py）',
+                '🔴 ' + (' ｜ '.join(_tail) or 'rc=%s' % _rcb), False,
+                'A-132：内联波段 id 语法 ⇒ 换册即假红/假绿')
+
     bad = [r for r in results if r['verdict'] == 'FAIL']
-    print('\n结论：%s' % ('✔ 改后门禁全绿（%d 项检查 · 含⑧教育线四闸＋⑨子模式自检＋⑩格式判据活性＋⑪Windows .cmd/退出码判空＋⑫写死版号巡检）' % len(results) if not bad
+    print('\n结论：%s' % ('✔ 改后门禁全绿（%d 项检查 · 含⑧教育线四闸＋⑨子模式自检＋⑩格式判据活性＋⑪Windows .cmd/退出码判空＋⑫写死版号巡检＋⑬波段 id 单源）' % len(results) if not bad
                         else '🔴 %d 项不符，不得宣布"改完"' % len(bad)))
     for r in bad:
         print('   - %s：期望 %s ／ 实测 %s' % (r['gate'], r['expect'], r['actual']))

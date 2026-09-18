@@ -128,7 +128,13 @@ def _work_refs(names, tmp):
             except Exception:
                 pass
     # 只保留"像文件"的项（带扩展名、无通配符、不含路径分隔符）
+    # ⚠ 2026-09-19 修（A-132 同批 · 判据过宽导致**假红**）：本判据首跑报了
+    #   `🔴 bookspec-%s.json 全包内均无 —— 新用户必跑不动`，而 `bookspec-%s.json` 是
+    #   **格式化模板**（`join(WORK, 'bookspec-%s.json' % task)`），**根本不是文件名**。
+    #   假红比漏检更伤：会诱导执行者去"补一个不存在的文件"（`A-55` 家族）。
+    #   修法：排除含 `%` 的格式化模板（真正的配套脚本名里不会有 `%`）。
     return {x for x in out if re.search(r'\.[A-Za-z0-9]+$', x) and '*' not in x
+            and '%' not in x and '{' not in x
             and '/' not in x and '\\' not in x}
 
 
@@ -155,6 +161,34 @@ def _cross_platform_issues(names, tmp):
                 and not re.search(r"'node'|\"node\"|os\.name|process\.platform", t)):
             bad.append('%s  硬要求 node.exe 且无平台兜底（Linux 上引擎二进制叫 node）' % n)
     return bad
+
+def _import_closure_issues(names, tmp):
+    """判据 D-import：**本地 import 闭包**。包内 Python 若 `import X`／`from X import ...`，
+    而 `X.py` 既不在包内、也未在 `optional-tools.json` 声明 ⇒ 该门禁在别人机器上必然 ImportError。"""
+    names = set(names)
+    declared = set(_optional_declared(tmp))
+    mods = {}
+    for n in sorted(names):
+        if not n.endswith('.py'):
+            continue
+        try:
+            t = io.open(os.path.join(tmp, n), encoding='utf-8', errors='replace').read()
+        except Exception:
+            continue
+        mods[os.path.basename(n)[:-3]] = (n, t)
+    bad = []
+    for mod, (n, t) in mods.items():
+        for m in set(re.findall(r'^\s*(?:import|from)\s+([A-Za-z_][A-Za-z0-9_]*)', t, re.M)):
+            if m in mods or m == mod:
+                continue
+            # 只有当"被引用名"看起来像本地工具时才算（避免误报标准库/三方库）
+            if m.endswith(('_candidates', '_merge', '_merge_task', '_oracle', '_matrix',
+                           '_regression', '_acceptance', '_scan', '_check', '_probe',
+                           '_gate', '_util', '_paths', '_common', '_inventory', '_diff',
+                           '_overlap', '_stamp', '_sync', '_quote', '_quotes', '_lines')):
+                if (m + '.py') not in names and m not in declared:
+                    bad.append('%s  import %s（包内与可选声明中都没有）' % (os.path.basename(n), m))
+    return sorted(set(bad))
 
 def main():
     tgz = next((a.split('=', 1)[1] for a in sys.argv if a.startswith('--tgz=')), None)
@@ -257,6 +291,15 @@ def main():
     else:
         print('     ✔ 0 处（跨平台解析链齐备）')
 
+    _imp = _import_closure_issues(names, tmp)
+    print('  D-import 包内 Python 的本地 import 闭包（引用到的本地模块必须在包内或显式可选）')
+    if _imp:
+        for _x in _imp[:10]:
+            print('     🔴 %s' % _x[:96])
+        _miss = _miss + _imp
+    else:
+        print('     ✔ 0 处（import 闭包完整）')
+
     print('  E 异机 0 裸栈（无 DSH 数据/无 .dsh 祖先下跑包内门禁）')
     _bad = check_foreign_no_traceback(tmp, names)
     if _bad:
@@ -299,7 +342,7 @@ def main():
         shutil.rmtree(fake, ignore_errors=True)
     shutil.rmtree(tmp, ignore_errors=True)
     print()
-    print('结论：%s' % ('✔ 可在别人电脑上跑（A/B/C/D/E/F 六判据全过）' if (ok_all and not _xp)
+    print('结论：%s' % ('✔ 可在别人电脑上跑（A/B/C/D/D-配套/D-import/E/F 判据全过）' if (ok_all and not _xp)
                      else '🔴 有硬项 —— **不得发布**（用户明确要求：别人用不了的插件不要再发）'))
     return 0 if ok_all else 1
 

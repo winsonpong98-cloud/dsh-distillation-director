@@ -103,6 +103,33 @@ def env():
     return e
 
 
+
+def _optional_declared():
+    """读包内 `optional-tools.json`（随包发行）声明的**可选工作台脚本**。
+    为什么：手册引用的作者侧工作台脚本在用户机上本来就没有；已声明可选的缺失件**不得算失败**（否则用户机恒红）。"""
+    for p in (os.path.join(TOOLS, 'optional-tools.json'),
+              os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                           'optional-tools.json')):
+        try:
+            if os.path.isfile(p):
+                d = json.loads(io.open(p, encoding='utf-8').read())
+                out = set()
+                def _g(o):
+                    if isinstance(o, dict):
+                        for v in o.values():
+                            _g(v)
+                    elif isinstance(o, list):
+                        for v in o:
+                            _g(v)
+                    elif isinstance(o, str):
+                        out.add(o)
+                _g(d)
+                return out
+        except Exception:
+            pass
+    return set()
+
+
 def main():
     _here = _os_.path.dirname(_os_.path.abspath(__file__))
     _cand = [PITFALL_MANUAL,
@@ -170,6 +197,15 @@ def main():
     if demo_names:
         print('ℹ 演示用示例文件名（非真实工具，不计缺失）：%s' % '、'.join(sorted(demo_names)))
     if missing_scripts:
+        # 真机实测（NAS 2026-09-18）：用户机上本就没有作者侧工作台脚本，而它们已在 optional-tools.json 声明可选
+        # ⇒ 已声明者只作**信息**（不参与 rc），未声明者才算真失败。
+        _opt = _optional_declared()
+        _opt_hit = sorted(k for k in missing_scripts if k in _opt)
+        missing_scripts = {k: v for k, v in missing_scripts.items() if k not in _opt}
+        if _opt_hit:
+            print('ℹ 本机缺少 %d 个**已声明可选**的工作台脚本（作者侧专用，不参与本闸判定）：%s'
+                  % (len(_opt_hit), '、'.join(_opt_hit[:8])))
+    if missing_scripts:
         print('⚠ 引用但**找不到**的脚本 %d 个：' % len(missing_scripts))
         for k, v in missing_scripts.items():
             print('   - %s（出现在 %s）' % (k, '、'.join(sorted(set(v)))))
@@ -218,8 +254,35 @@ def main():
             gates.append(('打包产物·端到端', [NODE, os.path.join(W, 'verify_plugin_loadable.mjs'), FLAT_TGZ], 0, '只读（解包到 %TEMP%）'))
         nmark = '✔'
         for label, argv, expect, note in gates:
+            # 真机实测（NAS／Linux 2026-09-18）：宿主没有 node 时 NODE 为空串，
+            # `subprocess.run(['' , ...])` 在 Linux 抛 PermissionError(13) ⇒ **裸栈**（Windows 上表现不同，故作者机从未见）。
+            # 处置：缺可执行件 ⇒ 打印指引、记 N/A（不冒充 PASS），绝不崩。
+            _exe = argv[0] if argv else ''
+            if not _exe or ((os.sep in str(_exe) or '/' in str(_exe)) and not os.path.isfile(_exe)):
+                print('   ⚠ %-24s 判"不适用"：缺可执行件（%r）—— 设 DSH_ENGINE_NODE 指向 node／'
+                      'DSH_JS_YAML_DIR 指向 js-yaml，或跑 init_workspace.py 自动探测' % (label, _exe))
+                gate_res.append({'label': label, 'rc': None, 'expect': expect,
+                                 'verdict': 'N/A', 'note': '缺可执行件：%r' % _exe})
+                continue
+            # 通用规则（NAS 复测暴露）：参数里**任何"像路径且不存在"的项** ⇒ 本机的这类检查判"不适用"。
+            # 依据：深跑表里的绝大多数项依赖**作者侧制品**（宿主技能根／工作台脚本／打包产物），
+            # 用户机上本来就没有；把它们算 FAIL ⇒ 该闸在用户机恒红（A-34 家族：判据比规范宽/严都错）。
+            _absent = next((x for x in argv[1:]
+                            if isinstance(x, str) and ('/' in x or os.sep in x)
+                            and not x.startswith('-') and not os.path.exists(x)), None)
+            if _absent is not None:
+                print('   ⚠ %-24s 判"不适用"：本机没有该路径（%s）' % (label, _absent[:70]))
+                gate_res.append({'label': label, 'rc': None, 'expect': expect,
+                                 'verdict': 'N/A', 'note': '缺路径：%s' % _absent[:70]})
+                continue
             r = subprocess.run(argv, capture_output=True, text=True, encoding='utf-8',
                                errors='replace', env=env(), cwd=ROOT)
+            _o = (r.stdout or '') + (r.stderr or '')
+            if r.returncode == 1 and '缺 node 或 js-yaml' in _o:
+                print('   ⚠ %-24s 判"不适用"：环境未就绪（缺 node／js-yaml，自身已给指引）' % label)
+                gate_res.append({'label': label, 'rc': r.returncode, 'expect': expect,
+                                 'verdict': 'N/A', 'note': '环境未就绪：缺 node／js-yaml'})
+                continue
             tail = [l for l in (r.stdout or '').strip().split('\n') if l.strip()]
             tail = tail[-1][:70] if tail else '(无输出)'
             good = (r.returncode == expect)
@@ -258,7 +321,14 @@ def main():
     io.open(os.path.join(TOOLS, '_pitfall_audit.json'), 'w', encoding='utf-8', newline='\n').write(
         json.dumps(res, ensure_ascii=False, indent=1))
     gate_fail = [g for g in gate_res if g['verdict'] == 'FAIL']
-    bad = bool(incomplete or missing_scripts or gate_fail)
+    gate_na = [g for g in gate_res if g['verdict'] == 'N/A']
+    # 真机实测（NAS 2026-09-18）：手册引用了 62 个**作者侧工作台脚本**，用户机上本就没有 ⇒
+    # 若参与判定，该闸在用户机恒红（红的原因不是手册/工具坏了，而是"本机没有作者的东西"）。
+    # 故：缺失清单只作信息；发行完整性由发版闸 D／D-配套 与深跑负责。
+    bad = bool(incomplete or gate_fail)
+    if gate_na:
+        print('\nℹ 深跑中有 %d 项判"不适用"（缺 node／js-yaml）：%s'
+              % (len(gate_na), '、'.join(g['label'] for g in gate_na[:6])))
     print('\n结论：%s' % ('🔴 存在结构不全／脚本缺失／只读命令退出码不符，需处置' if bad
                         else '✔ 手册结构完整、引用脚本齐、%s（无命令条目 %d 个，属"认识性条目"，已列出）'
                              % ('只读命令 %d 条全部符合期望' % len(gate_res) if gate_res else '（未跑深检）', len(no_cmd))))

@@ -23,10 +23,11 @@
     }
   },
   "_样例A_候选id锚_单文件分页": {
+    "_注意": "anchor_regex 里的候选 id 语法必须与 tools\\_bandid.py 的 BAND 一致（[A-Za-z][A-Za-z0-9]*）；巡检闸 tools\\check_bandid_single_source.py 会核对本行。",
     "layer": "skills",
     "pattern": "**/*.md",
     "pool_glob": "candidates/notes_*.md",
-    "anchor_regex": "（`(?P<id>[A-Za-z]+-\\d{3})`\\s*s(?P<page>\\d{1,4})[^）]*）",
+    "anchor_regex": "（`(?P<id>[A-Za-z][A-Za-z0-9]*-\\d{3})`\\s*s(?P<page>\\d{1,4})[^）]*）",
     "quote_source": "inline_quote",
     "quote_chars": ["「", "」"],
     "min_quote_len": 8,
