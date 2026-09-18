@@ -1,8 +1,8 @@
 {
  "name": "dsh-distillation-director",
- "version": "4.9.7",
+ "version": "4.9.8",
  "license": "AGPL-3.0-or-later",
- "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.9.7：**判据语法单一来源 ＋ 跨册回归**——2026-09-19 在 NAS 上实测到「同一份**合规**产出在不同仪器下时红时绿」：波段 id 语法被内联写在 17 处、共 4 种残缺写法（`[A-Za-z]+` 吃不到「字母＋数字」波段 `E1`/`T1`），于是 `verify_candidates` 报 🔴 切块为空 而 `gate_stage` 却 ✔；本版建唯一真源 tools/_bandid.py 并回改 17 处，新增单源闸 check_bandid_single_source.py（10 样本自证）挂 postflight ⑬，gate_selftest 增 E1 成对差分样本，空集报错改为「打印期望语法＋实测标题行」，§25 固化三条铁律；避坑手册 v3.7（A-132）)",
+ "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.9.8：**分发通道可用性与对外数字口径**——2026-09-19 真机实测发现作者本机与 NAS 均访问不了 github.com（TCP 超时）而 api.github.com 正常，README 主推的固定链接路径整条失效 ⇒ 新增 **路径 E（API 直连，无需令牌，实测可用）** 与「网络与替代通道」一节，纪律入册 A-134「发得出去 ≠ 下得回来」；同时把「战绩清单」全部改为**可复算口径**（旧数字过时：技能数 43/22 → 实测 49/23）并纠正把「估算 ¥20.5」当作「实测」的说法（实测 ¥17.5，余额差口径），新增异机真机实测与「门禁抓过我」两张表，纪律入册 A-135「对外数字必须可复算」；目录结构门禁件数 27 → 34；SKILL.md §24.6）",
  "keywords": [
   "dsh-plugin",
   "deepseek-harness",

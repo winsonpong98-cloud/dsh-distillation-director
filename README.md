@@ -1,4 +1,4 @@
-# distillation-director · 蒸馏主管（V4.9.7 · 发行自足 ＋ 三闸判态 ＋ §21 强制门禁 ＋ 装机态三层律 ＋ 判据单一来源 ＋ 防坑体系）
+# distillation-director · 蒸馏主管（V4.9.8 · 发行自足 ＋ 三闸判态 ＋ §21 强制门禁 ＋ 装机态三层律 ＋ 判据单一来源 ＋ 防坑体系）
 
 把一本书蒸馏成一组可执行的 Agent 技能——**判态制元技能**（权威执行标准）。
 
@@ -12,7 +12,7 @@
 
 > ⚠️ **v4.9.3 起请勿用 npm 那条（路径 A）**：npm registry 上目前仍是 **4.6.6**，而 4.6.6 **不含 §21 三道闸
 > （`gate_start.py`／`gate_stage.py`／`gate_checklist.py`）与 4 个配套脚本**，装了跑不动。
-> **v4.9.7** 请用 **B / C / D** 任一条；npm 待发版后本提示会撤掉。
+> **v4.9.8** 请用 **B / C / D / E** 任一条；npm 待发版后本提示会撤掉。
 
 ```bash
 # A. npm 一行直装（⚠️ 目前仍是 4.6.6，缺 §21 闸；4.9.x 未上架 npm 前请勿使用）
@@ -22,13 +22,21 @@ dsh plugin add dsh-distillation-director
 dsh plugin add https://github.com/winsonpong98-cloud/dsh-distillation-director/releases/latest/download/dsh-distillation-director.tgz
 
 # B'. 指定版本直装（要固定字节时用这条）
-dsh plugin add https://github.com/winsonpong98-cloud/dsh-distillation-director/releases/download/v4.9.7/dsh-distillation-director-4.9.7.tgz
+dsh plugin add https://github.com/winsonpong98-cloud/dsh-distillation-director/releases/download/v4.9.8/dsh-distillation-director-4.9.8.tgz
 
 # C. 从仓库直装（需要能访问 GitHub；仓库已锁定行尾字节保真；可指定 tag）
-dsh plugin --profile web add github:winsonpong98-cloud/dsh-distillation-director#v4.9.7
+dsh plugin --profile web add github:winsonpong98-cloud/dsh-distillation-director#v4.9.8
 
 # D. 从 Release 页面下载 tgz 后本地装（字节与作者双门校验过的发行件完全一致）
-dsh plugin add <你下载到的 dsh-distillation-director-4.9.7.tgz 路径>
+dsh plugin add <你下载到的 dsh-distillation-director-4.9.8.tgz 路径>
+
+# E. 🆕 网络挡了 github.com 时的替代通道（走 api.github.com 直连，**无需令牌**）
+#    2026-09-19 实测：作者本机与 NAS 均**无法访问 github.com**（TCP 超时），而 api.github.com 正常 ⇒
+#    路径 B 在这类网络下整条失效。api.github.com 的资产直连**已验证可用**（见下方「网络与替代通道」）。
+curl -s https://api.github.com/repos/winsonpong98-cloud/dsh-distillation-director/releases/latest | grep '"id"'
+curl -L -H 'Accept: application/octet-stream' -o dsh-distillation-director.tgz \
+  https://api.github.com/repos/winsonpong98-cloud/dsh-distillation-director/releases/assets/<ASSET_ID>
+dsh plugin add ./dsh-distillation-director.tgz
 ```
 
 > 四条路径的关系：**B** 走 GitHub Release 的**别名资产**（`…/releases/latest/download/dsh-distillation-director.tgz`，链接永不随版本变化，本版已同时上传该别名件）；**B′** 是带版本号的固定链接；**C** 走 git 仓库（`.gitattributes` 锁定行尾字节，保证"直装字节＝发行字节"）；**D** 是最稳的离线路径；**A** 待 npm 发版后恢复为最短路径。
@@ -50,22 +58,43 @@ python tools\gate_start.py --task <你的任务 slug>
 
 ## 战绩清单（实测背书）
 
-| 维度 | 数据 |
+> **本表每个数字都是"本机跑一条命令就能复算"的**（复算方式见下表末行）。
+> **不列具体书名**：插件是「蒸馏方法论文档」，只含流程/规则/判态标准/机器层脚本；具体书目属**使用者自己的台账**
+> （《避坑手册》`A-74`：通用件里不得有任何一本书的数据）。
+> **也不写"估算"冒充"实测"**：凡标注"实测"的，都能在场产物里逐项对出来（`A-135`）。
+
+| 维度 | 数据（2026-09-19 实测） |
 |---|---|
-| 已蒸馏书籍 | **19 本**（投资 13 本 + 教育/心理 5 本 + 技术标准 1 本） |
-| 产出技能 | **约 70 个**（金融投资 43 个 + 教育/心理 22 个 + 技术 4 个） |
-| 质量 | 零🔴、A 档交付（三闸判态制门禁） |
-| 单本成本 | **¥20.5 实测**（L2.5 epub 文字版 ≈14 万字，35 次 flash 子代理 + 机器层 ¥0） |
-| 机器层 | 零成本先行（引文逐字核验 / 盲测词表 / 防线3 冒充扫描 / 9 维预检，全部本地脚本） |
+| 本机蒸馏册数 | **10 本**（投资/金融类书树 7 ＋ 教育·心理·行为类任务 3；**另有 1 本在 NAS 上跑**） |
+| 产出技能 | **77 个**（上述书树／任务产出的 slug 去重并集） |
+| 在役技能 | **71 个**（金融宿主 49 ＋ 教育宿主 23，跨宿主机重复 1 个）；另有 **25 个已封存**（archived） |
+| 三闸判态 | **零🔴**（防线3 忠实度／盲测路由／达尔文体检；**▲ 建议项如实登记**，不删不掩） |
+| 单本成本（L2.5） | **¥17.5 实测**（账户余额差口径，文字版≈14 万字）；**开工前估算 ¥20.5** ⇒ 实测低 **14.5%** |
+| 机器层成本 | **¥0**（引文逐字核验／盲测词表／防线3 冒充扫描／9 维预检，全部本地脚本，不花 API） |
+| **异机真机实测** | **NAS（Synology ＋ DSH Linux 容器）**：装机**三层读数**全通、整本 L2.5 **跑通交付**、六阶段门禁 **全 PASS**、候选池 **236 条引文 100% 回源命中** |
+| 工装自纠 | 上述真机跑动**逼出两处"尺子"缺陷**（波段 id 语法内联 17 处／源文件决议两套规则）**并已修复落闸** —— 见下方「这套门禁真的会抓东西吗」 |
+| 复算命令 | `python .work/_count_record2.py`（口径：目录内含 `SKILL.md` 才算技能；排除审计副本与封存件） |
+
+**这套门禁真的会抓东西吗？**（不是"我声称它有用"，而是**它抓过我**）
+
+| 抓到的 | 症状 | 结局 |
+|---|---|---|
+| 波段条目 id 语法**内联 17 处、4 种残缺写法** | 同一份**合规**产出，一个仪器报 🔴、另一个报 ✔（**一手绿一手红**） | 收敛为 `_bandid.py` 单一真源 ＋ 新闸 `check_bandid_single_source.py`（内联即判红，10 样本自证） |
+| 「源文件决议」写了**两套规则** | 源被决议到**任务自己的产出文档**，6 波段 **236/236 条引文全报"回源未命中"**（会诱导你去改**合规的产出**） | 收敛为唯一函数 `resolve_src()` ＋ 兜底**内容闸**（必须真含页标记） |
+| 装机"装了两层只通一层" | 文件在、`plugin list` 列得出，**但技能永不注册且不报错** | 三层读数闸 `check_install_state.py`（挂 `postflight`） |
+| "改了却没进包"**三种形态** | 手写清单漏件／换了手册没同步／**重建了但没替换已发布资产** | 清单改**闭包推导**＋剪枝；补 SKILL.md 同步步；发版闸**对下载到的字节**复验 |
 
 <details>
 <summary><b>实测口径说明（点开）</b></summary>
 
-- **投资方法论类 13 本**、**教育／心理类 5 本**、**技术标准 1 本**（按**类别**统计）。
-- **本插件与本文档不列举具体书名**——插件是「蒸馏方法论文档」，只含流程、规则、判态标准与机器层脚本；
-  具体书目属**使用者自己的蒸馏台账**，不进插件载荷（《避坑手册》A-74：通用件里不得有任何一本书的数据）。
-- 上表所有数字（本数／技能数／成本／质量）均为**本机实测**，可复核口径见 `SKILL.md` 内置成本基准与
-  `.work/<task>/` 下的实测产物；**它们描述的是"方法在这类书上跑过"，不含任何书的内容**。
+- **"册数"怎么数**：凡有 `skills/<slug>/SKILL.md` 产出的**书树或任务目录**记 1 册（不看书名、不看字数）。
+- **"技能"怎么数**：目录内含 `SKILL.md` 才算；审计用的**副本目录**（如 `dupfx-audit-tmp`）与**封存件**（`archived/`）不计。
+- **成本口径**：官方主口径＝**账户余额差**（外部账本给出，与被测对象无关）。本机另有**会话级台账**与**按天台账**
+  两个参照口径，三者最大差 **约 7 倍**（计价模型不同），**如实并列、不择一、不平均**；
+  对外只引用主口径，分歧细节见工作区 `口径登记单`（`K-02`／`K-03`）。
+- **质量口径**：**判态制**，不打分。三闸＝防线3 忠实度／盲测路由／达尔文体检，判据是**零🔴**；
+  **▲ 类建议项不隐藏**——本项目曾有一整轮"停在 4 个 ▲、10 条已知边界"如实收口，而不是刷成 0。
+- 上表所有数字均为**本机实测**，可复核；**它们描述的是"方法在这类书上跑过"，不含任何书的内容**。
 
 </details>
 
@@ -74,9 +103,11 @@ python tools\gate_start.py --task <你的任务 slug>
 | 维度 | 通用框架 | 本插件 |
 |---|---|---|
 | 定位 | 书/视频/播客/课程全科 | **专注书籍蒸馏专科** |
-| 验证 | 通用模板 | **三闸判态 + 逐字核验** |
-| 机器层 | 无 | **有（脚本 ¥0）** |
-| 公开战绩/成本 | 无 | **19 本 → 约 70 个技能零🔴、¥20.5/本实测** |
+| 验证 | 通用模板 | **三闸判态 + 逐字回源核验** |
+| 机器层 | 无 | **有（本地脚本 ¥0）** |
+| 公开战绩/成本 | 无 | **10 册 → 77 个技能零🔴、¥17.5/册实测**（口径可复算） |
+| 门禁强度 | 约定式 | **命令级拦截**（§21：开工自证闸／阶段依赖链／执行单逐项闸，未过跑不动） |
+| 异机可用性 | 未声明 | **真机实测**（Windows ＋ Linux 容器；跨平台静态判据 ＋ 空假根仿真） |
 
 ---
 
@@ -88,6 +119,9 @@ python tools\gate_start.py --task <你的任务 slug>
 - **路径 B（GitHub Release 固定链接）**：别名资产链接**永远指向最新版**，**不需要 npm 也能装**——这是"npm 通道不可用"时的备用通道。
 - **路径 C（仓库直装）**：仓库已加 `.gitattributes`（`* -text`）**禁用 git 行尾转换**，因此克隆／直装得到的字节与发行 tgz 一致（这是被实测修过的坑，见下「发行纪律」）。
 - **路径 D（本地 tgz）**：适合离线／内网／要固定字节的场景。Release 页资产即**作者本机双门校验通过的那一份**。
+- **路径 E（API 直连替代通道）** 🆕：**网络挡了 `github.com` 时用**——走 `api.github.com` 的资产直连（无需令牌）。
+  2026-09-19 实测：作者本机与 NAS **都访问不了 `github.com`**（TCP 超时，偶发抖动），而 `api.github.com` 正常
+  ⇒ **路径 B 在这类网络下整条失效**；路径 E 已验证可用（HTTP 200／字节与本地一致）。详见下方「网络与替代通道」。
 - 所有路径最终都产生同一条挂载配置：
 
 ```yaml
@@ -132,7 +166,6 @@ python scripts/gates/check_install_state.py --json out.json  # 机器可读
 ```
 
 **若 ② 缺失（最常见的失败）**，按顺序修：
-
 ```bash
 cp <profile>/package.json <profile>/package.json.bak-$(date +%Y%m%d)
 dsh plugin --profile <profile> add <包名或插件目录或 tgz>   # 官方命令会按安装态 reconcile，自动写入 bundles
@@ -151,16 +184,27 @@ dsh plugin --profile <profile> add <包名或插件目录或 tgz>   # 官方命�
 ## 目录结构
 
 ```
-SKILL.md          技能正文（**V4.9.7 权威**；§0–§16 基干 ＋ §17–§25 历次增补）
+SKILL.md          技能正文（**V4.9.8 权威**；§0–§16 基干 ＋ §17–§25 历次增补）
 index.js          插件壳（注册技能）
-scripts/          机器层脚本（4 件）＋ **WORK 配套脚本（4 件）**：yaml_check_generic.cjs ／ skill_probe_generic.mjs ／ w1b_extract.mjs ／ w1b_validate.mjs
-scripts/gates/    **门禁套件 27 件**：gate_start ／ gate_stage ／ gate_checklist（§21 三道强制门禁）＋ gate_common ／ gate_bootstrap ／ init_workspace ／ preflight ／ postflight ／ gate_selftest ／ pitfall_audit ／ check_* 等；并随带《蒸馏工程避坑手册》与《V3.1全量执行单》
 cordis.patch.yml  挂载配置
 extractors/       提取器提示词模板
-scripts/          机器层脚本 4 件（machine_precheck_v2 / machine_layer_readycheck /
-                  defense3_impersonation_scan / blindtest_lexicon_mock_v1；全部本地运行、零 API 成本）
-manual-history/   历史版本手册存档（4 件，文件名即如此：manual-v2.0 / manual-v3.0 / manual-V4.0 / manual-V4.1）
+scripts/          机器层脚本 **4 件**（machine_precheck_v2 ／ machine_layer_readycheck ／
+                  defense3_impersonation_scan ／ blindtest_lexicon_mock_v1；全部本地运行、零 API 成本）
+                  ＋ **WORK 配套脚本 4 件**（yaml_check_generic.cjs ／ skill_probe_generic.mjs ／
+                  w1b_extract.mjs ／ w1b_validate.mjs）
+scripts/gates/    **门禁与工具 34 件**：§21 三道强制门禁（gate_start ／ gate_stage ／ gate_checklist）
+                  ＋ gate_common ／ gate_bootstrap ／ init_workspace ／ preflight ／ postflight ／
+                  gate_selftest ／ pitfall_audit ＋ check_*（含**判据单源闸** check_bandid_single_source、
+                  **装机三层闸** check_install_state、**可移植性发版闸** check_plugin_portability…）
+                  ＋ 一致性仪器（`_bandid.py` 单一真源、verify_candidates、stage15_merge_task、
+                  verify_layer_quotes、layer_quotes_gate、check_layer_sync…）
+                  ＋ 形态普查器 diag_hline_blockmatch.py
+                  ＋ 随带《蒸馏工程避坑手册》（**v3.9**）与《V3.1全量执行单》
+manual-history/   历史版本手册存档（5 件：manual-v2.0 / manual-v3.0 / manual-V4.0 / manual-V4.1 / 等）
 ```
+
+> **计数口径**：`scripts/gates/` 的文件数＝**发版闸解包级校验**读到的件数（`python scripts/gates/verify_plugin_pack.py`）；
+> 本段数字若与包内不符，以该命令输出为准（`A-135`：对外数字必须可复算）。
 
 ---
 
@@ -179,16 +223,55 @@ manual-history/   历史版本手册存档（4 件，文件名即如此：manual
 | v4.6.5 | 2026-09-15 | README 与发行件同步到当前版本；补齐 v4.4.0–v4.6.4 的版本表与安装路径；**发行保真两处修复**（打包器剔除 `__pycache__` 编译产物；新增 `.gitattributes` 锁定行尾字节） |
 | v4.6.6 | 2026-09-15 | **上架 npm registry**（`dsh plugin add dsh-distillation-director` 一行直装）；README 安装路径更新为**四条**并标注各自适用场景；新增"GitHub Release 固定链接"作为**不依赖 npm 的备用通道** |
 | v4.6.7–4.9.2 | 2026-09-17 | 逐处回改批／继承项纳管批／落地审计批／可移植性专项批：**工具随包发行**（发版闸 A–E、`layer_quotes_gate`／`check_layer_sync`／`check_instrument_coverage`＋配套脚本）、`init_workspace.py` 一键初始化；手册升到 v3.2（A-01…A-105） |
-| **v4.9.7** | **2026-09-19** | **本版**：**判据语法单一来源 ＋ 源文件决议单一来源**（NAS 异机真机两轮实测固化）——① 建唯一真源 `scripts/gates/_bandid.py`（波段条目 id 语法 `[A-Za-z][A-Za-z0-9]*-\d{3}`）并**回改 17 处内联**（旧代码 4 种残缺写法 ⇒ **同一份合规产出在不同仪器下时红时绿**：`verify_candidates` 报 `🔴 切块为空`、`gate_stage` 却 ✔）；② 新增闸 **`check_bandid_single_source.py`**（内联即判红，含 10 个正负样本自证）挂 **`postflight ⑬`**（29→**31 项**）；③ `verify_candidates` 抽出**唯一决议函数 `resolve_src()`**（探测与校验共用；兜底**必须过内容闸**＝真含页标记，避免把**任务自己的产出文档**当源）＋ 空集/全数未命中报错改为**自证型**（打印期望语法／实测标题行／实际使用的源＋三步处置）＋ 新增 **▲ 一条目多引文** 可见性；④ `gate_selftest` 由六坏扩为 **九组**（新增 `E1` 成对差分／单源闸自证／**源决议陷阱**）；⑤ `tools/diag_hline_blockmatch.py` 重写为**形态普查器**（5 把尺子 × 6 形态 ＋ `--census` 真实册并排）；⑥ 发行侧修掉三处"改了却没进包"（手写清单 → **闭包推导**＋剪枝、补 **SKILL.md 同步步**、`optional-tools.json` 与事实对齐）；手册 **§25**（R33–R37）＋避坑手册 **v3.8**（`A-132`／`A-133`，155→156 条） |
+| **v4.9.8** | **2026-09-19** | **本版**：**分发通道的可用性假设 ＋ 对外数字必须可复算**——① 真机实测发现**作者本机与 NAS 都访问不了 `github.com`**（TCP 超时）而 `api.github.com` 正常 ⇒ README 原本主推的**固定链接（路径 B）在这类网络下整条失效**；新增**路径 E（API 直连，无需令牌；已实测 HTTP 200／字节与本地一致）**＋ 新增「网络与替代通道」一节；② 「战绩清单」**全部改为可复算口径**（旧数字过时：技能数仍写 `43／22`，实测 **`49／23`**）＋ 把**"估算 ¥20.5"冒充实测**改为**"实测 ¥17.5"**（余额差口径，估算值显著标出）＋ 新增**异机真机实测**与**"门禁抓过我"**两张表 ＋ 给出复算命令；③ 目录结构纠错（门禁件数 **27 → 34**、删掉重复的 `scripts/` 条目）；④ 避坑手册 **v3.9**（`A-134`／`A-135`）＋ SKILL.md **§24.6**（分发通道可用性） |
+| v4.9.7 | 2026-09-19 | **判据语法单一来源 ＋ 源文件决议单一来源**（NAS 异机真机两轮实测固化）——① 建唯一真源 `scripts/gates/_bandid.py`（波段条目 id 语法 `[A-Za-z][A-Za-z0-9]*-\d{3}`）并**回改 17 处内联**（旧代码 4 种残缺写法 ⇒ **同一份合规产出在不同仪器下时红时绿**：`verify_candidates` 报 `🔴 切块为空`、`gate_stage` 却 ✔）；② 新增闸 **`check_bandid_single_source.py`**（内联即判红，含 10 个正负样本自证）挂 **`postflight ⑬`**（29→**31 项**）；③ `verify_candidates` 抽出**唯一决议函数 `resolve_src()`**（探测与校验共用；兜底**必须过内容闸**＝真含页标记，避免把**任务自己的产出文档**当源）＋ 空集/全数未命中报错改为**自证型**（打印期望语法／实测标题行／实际使用的源＋三步处置）＋ 新增 **▲ 一条目多引文** 可见性；④ `gate_selftest` 由六坏扩为 **九组**（新增 `E1` 成对差分／单源闸自证／**源决议陷阱**）；⑤ `diag_hline_blockmatch.py` 重写为**形态普查器**（5 把尺子 × 6 形态 ＋ `--census` 真实册并排）；⑥ 发行侧修掉三处"改了却没进包"（手写清单 → **闭包推导**＋剪枝、补 **SKILL.md 同步步**、`optional-tools.json` 与事实对齐）；手册 **§25**（R33–R37）＋避坑手册 **v3.8**（`A-132`／`A-133`，155→156 条） |
 | v4.9.5–4.9.6 | 2026-09-19 | 换书实测批（**未发布**）：候选校验的**源基准**判据放宽到 `.md`、候选条目标签**容错**（`锚`／`页锚`／`出处`、半角冒号、`逐字原文`）；`gate_selftest` 增执行单例外登记成对样本 |
 | **v4.9.4** | **2026-09-18** | **装机态三层律**（NAS 容器真机实测固化）——把"装了但不生效"的判据做成随包仪器 **`scripts/gates/check_install_state.py`**（落盘①／登记②／在役③ 三层逐层读数 ＋ 逐层修法 ＋ `--self-test` 四类坏样本自证）、挂 **`postflight ⑧-g`**（27→29 项）；**§6 打包流程由一行散文改写为「三步带读数」**；新增 **§17.10 装机态三层律**；README「验证装上了」由一条命令扩为**三层读数**（含最常见的失败＝`bundles` 缺项及修法）；避坑手册 **v3.5**（`A-119`…`A-124` 六条） |
 | v4.9.3 | 2026-09-18 | **发行自足与跨平台**——`scripts/gates/` **27 件首次随包发行**（含 §21 三道闸 `gate_start.py`／`gate_stage.py`／`gate_checklist.py`）＋ **4 个配套脚本**（`yaml_check_generic.cjs`／`skill_probe_generic.mjs`／`w1b_*.mjs`）；发版闸由 A–E 升为 **A/B/C/D/D-配套/E/F**（新增"配套脚本必须随包"与"跨平台静态判据"）；node/js-yaml 解析链跨平台；`init_workspace` 上溯找包根＋两种布局取件；缺目录不再崩栈；手册 **v3.4**（A-106…A-118 共 13 条） |
 
-> **从哪装最省事（v4.9.7 现状）**：用固定链接那条 `dsh plugin add https://github.com/winsonpong98-cloud/dsh-distillation-director/releases/latest/download/dsh-distillation-director.tgz`（路径 B）。**npm 通道目前仍是 4.6.6（缺 §21 闸），4.9.x 上架 npm 后本段会改回"一行直装"。** 装完**务必按「安装细节 → 验证装上了」读三层读数**（2026-09-18 实测最凶的失败模式就是"装上了但 `bundles` 里没有它"）。
+> **从哪装最省事（v4.9.8 现状）**：正常网络用固定链接那条 `dsh plugin add https://github.com/winsonpong98-cloud/dsh-distillation-director/releases/latest/download/dsh-distillation-director.tgz`（路径 B）；
+> **若那条取不到（本机 2026-09-19 实测就取不到）**，用**路径 E**（`api.github.com` 直连）或**路径 D**（本地 tgz），见下一节。
+> **npm 通道目前仍是 4.6.6（缺 §21 闸），4.9.x 上架 npm 后本段会改回"一行直装"。**
+> 装完**务必按「安装细节 → 验证装上了」读三层读数**（2026-09-18 实测最凶的失败模式就是"装上了但 `bundles` 里没有它"）。
 
 > **版本编号说明（v4.3 未独立发布）**：**`v4.3` 是跳过的编号，未独立发版**。v4.2.0 提交信息里的"v4.3"指**机器层脚本口径**、v4.6.4 提交信息里的"V4.3"指**防坑体系批次**，二者均非插件版本号；「防坑体系 37 条 ＋ 三件门禁」实际随 **v4.2.2** 收口轮交付。故编号自 v4.2.2 直接进入 v4.4.0。
 
-完整手册演进见 `manual-history/` 与技能正文 `SKILL.md` §16–§22。
+完整手册演进见 `manual-history/` 与技能正文 `SKILL.md` §16–§25。
+
+---
+
+## 网络与替代通道（`github.com` 取不到时）
+
+**先说清楚这不是"我们没发"**：发行件本身经**从公网回读验签**（下载回来比字节 ＋ 对下载到的字节重跑发版闸）。
+
+**2026-09-19 真机实测**（同一时刻、两台机器、三个主机）：
+
+| 主机 | 作者本机（Windows） | NAS（Synology） |
+|---|---|---|
+| `github.com:443` | ❌ TCP 超时（偶发一次 200 ⇒ **抖动**） | ❌ `curl` 超时（HTTP 000） |
+| `api.github.com:443` | ✔ 通 | — |
+| `objects.githubusercontent.com:443` | ✔ 通 | — |
+
+⇒ **路径 B／B′（都在 `github.com` 上）在这类网络下整条失效**，而**路径 A（npm）又落后版本、路径 C（git）同样要 `github.com`**。
+故本插件提供**路径 E**：走 `api.github.com` 的资产直连（**公开仓库无需令牌**，实测可用）。
+
+```bash
+# 1) 取资产 id（latest 即最新版）
+curl -s https://api.github.com/repos/winsonpong98-cloud/dsh-distillation-director/releases/latest \
+  | grep -B2 -A8 'dsh-distillation-director' | grep '"id"'
+
+# 2) 直连下载（**必须带 Accept: application/octet-stream**，否则返回的是 JSON 元数据而不是文件）
+curl -L -H 'Accept: application/octet-stream' -o dsh-distillation-director.tgz \
+  https://api.github.com/repos/winsonpong98-cloud/dsh-distillation-director/releases/assets/<ASSET_ID>
+
+# 3) 本地装
+dsh plugin add ./dsh-distillation-director.tgz
+```
+
+**实测读数**：HTTP 200 ｜ 字节数与发行件一致 ｜ **md5 与本地一致** ✔。
+
+> **给内网/离线用户的建议**：把 tgz 一次下好留档（路径 D），后续装机都用它——**比任何在线通道都稳**。
+> 这条纪律来自 `A-134`：**"发得出去" ≠ "下得回来"**——**单一分发通道的可用性是一种假设，必须验证并准备替代**。
 
 ---
 
@@ -204,6 +287,7 @@ manual-history/   历史版本手册存档（4 件，文件名即如此：manual
 | 解包级校验 | 两个 tgz 与权威源逐字节一致 ＋ **包内无多余产物**（双向判据） |
 | 端到端可加载 | 对打包产物真 `import` ＋ 模拟注册，确认真能装上（不是"文件都在"） |
 | 三层字节一致 | 工作区 / git 索引 / tgz 三层逐字节相同（防 `core.autocrlf` 静默改写） |
+| **远端回读验签** 🆕 | **把已发布的资产从公网下载回来**：① 比字节（md5）；② **对下载到的字节重跑发版闸**（A/B/C/D/D-配套/D-import/E/C 全过）。防"本地是好的、远端是坏的"（`A-131` 第三形态） |
 
 **v4.6.5 修掉的两个发行缺陷**（都出自真实事故，已进避坑手册 `§9.5`）：
 
