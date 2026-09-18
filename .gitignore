@@ -16,3 +16,4 @@ __pycache__/
 *.pyc
 *.pyo
 PUBLISH-BLOCKED.txt
+_old-releases/
