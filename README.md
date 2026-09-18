@@ -1,4 +1,4 @@
-# distillation-director · 蒸馏主管（V4.6 · 三闸判态 ＋ §21 强制门禁 ＋ 防坑体系）
+# distillation-director · 蒸馏主管（V4.9.3 · 发行自足 ＋ 三闸判态 ＋ §21 强制门禁 ＋ 防坑体系）
 
 把一本书蒸馏成一组可执行的 Agent 技能——**判态制元技能**（权威执行标准）。
 
@@ -8,23 +8,30 @@
 
 ## 30 秒上手
 
-**① 安装**（四条路径任选其一；**前三条都验证过**）
+**① 安装**（四条路径任选其一）
+
+> ⚠️ **v4.9.3 起请勿用 npm 那条（路径 A）**：npm registry 上目前仍是 **4.6.6**，而 4.6.6 **不含 §21 三道闸
+> （`gate_start.py`／`gate_stage.py`／`gate_checklist.py`）与 4 个配套脚本**，装了跑不动。
+> 4.9.3 请用 **B / C / D** 任一条；npm 待发版后本提示会撤掉。
 
 ```bash
-# A. npm 一行直装（最省事；已在 npm registry 上架）
+# A. npm 一行直装（⚠️ 目前仍是 4.6.6，缺 §21 闸；4.9.3 未上架 npm 前请勿使用）
 dsh plugin add dsh-distillation-director
 
-# B. 固定链接直装（不需要 npm；永远指向最新版）
+# B. 固定链接直装（**推荐**；不需要 npm；别名资产永远指向最新版）
 dsh plugin add https://github.com/winsonpong98-cloud/dsh-distillation-director/releases/latest/download/dsh-distillation-director.tgz
 
-# C. 从仓库直装（需要能访问 GitHub；仓库已锁定行尾字节保真）
-dsh plugin --profile web add github:winsonpong98-cloud/dsh-distillation-director
+# B'. 指定版本直装（要固定字节时用这条）
+dsh plugin add https://github.com/winsonpong98-cloud/dsh-distillation-director/releases/download/v4.9.3/dsh-distillation-director-4.9.3.tgz
+
+# C. 从仓库直装（需要能访问 GitHub；仓库已锁定行尾字节保真；可指定 tag）
+dsh plugin --profile web add github:winsonpong98-cloud/dsh-distillation-director#v4.9.3
 
 # D. 从 Release 页面下载 tgz 后本地装（字节与作者双门校验过的发行件完全一致）
-dsh plugin add <你下载到的 dsh-distillation-director-vX.Y.Z.tgz 路径>
+dsh plugin add <你下载到的 dsh-distillation-director-4.9.3.tgz 路径>
 ```
 
-> 三条远程路径的关系：**A** 走 npm registry（最稳、最短）；**B** 走 GitHub Release 的别名资产（**npm 不可用时的备用通道**，链接永不随版本变化）；**C** 走 git 仓库（仓库已加 `.gitattributes` 锁定行尾字节，保证"直装字节＝发行字节"）。
+> 四条路径的关系：**B** 走 GitHub Release 的**别名资产**（`…/releases/latest/download/dsh-distillation-director.tgz`，链接永不随版本变化，本版已同时上传该别名件）；**B′** 是带版本号的固定链接；**C** 走 git 仓库（`.gitattributes` 锁定行尾字节，保证"直装字节＝发行字节"）；**D** 是最稳的离线路径；**A** 待 npm 发版后恢复为最短路径。
 
 **② 开一个新会话，说触发词**（任一）
 
@@ -100,8 +107,10 @@ dsh web --dump-config | findstr /C:"distillation-director"
 ## 目录结构
 
 ```
-SKILL.md          技能正文（V4.6 权威；§0–§16 基干 ＋ §17–§22 历次增补）
+SKILL.md          技能正文（V4.9.3 权威；§0–§16 基干 ＋ §17–§22 历次增补）
 index.js          插件壳（注册技能）
+scripts/          机器层脚本（4 件）＋ **WORK 配套脚本（4 件）**：yaml_check_generic.cjs ／ skill_probe_generic.mjs ／ w1b_extract.mjs ／ w1b_validate.mjs
+scripts/gates/    **门禁套件 27 件**：gate_start ／ gate_stage ／ gate_checklist（§21 三道强制门禁）＋ gate_common ／ gate_bootstrap ／ init_workspace ／ preflight ／ postflight ／ gate_selftest ／ pitfall_audit ／ check_* 等；并随带《蒸馏工程避坑手册》与《V3.1全量执行单》
 cordis.patch.yml  挂载配置
 extractors/       提取器提示词模板
 scripts/          机器层脚本 4 件（machine_precheck_v2 / machine_layer_readycheck /
@@ -124,9 +133,11 @@ manual-history/   历史版本手册存档（4 件，文件名即如此：manual
 | v4.6.0–4.6.2 | 2026-09-13 | §21 **强制门禁**：`gate_start` 开工自证闸 ＋ `gate_stage` 阶段依赖链 ＋ `gate_checklist` 执行单逐项闸；`preflight ⑤` 自动纳入活跃蒸馏任务 |
 | v4.6.3–4.6.4 | 2026-09-14 | §22 判官要求固化：「引文型附属文件」零问题检查表（R1–R8 断言） |
 | v4.6.5 | 2026-09-15 | README 与发行件同步到当前版本；补齐 v4.4.0–v4.6.4 的版本表与安装路径；**发行保真两处修复**（打包器剔除 `__pycache__` 编译产物；新增 `.gitattributes` 锁定行尾字节） |
-| **v4.6.6** | **2026-09-15** | **本版**：**上架 npm registry**（`dsh plugin add dsh-distillation-director` 一行直装）；README 安装路径更新为**四条**并标注各自适用场景；新增"GitHub Release 固定链接"作为**不依赖 npm 的备用通道** |
+| v4.6.6 | 2026-09-15 | **上架 npm registry**（`dsh plugin add dsh-distillation-director` 一行直装）；README 安装路径更新为**四条**并标注各自适用场景；新增"GitHub Release 固定链接"作为**不依赖 npm 的备用通道** |
+| v4.6.7–4.9.2 | 2026-09-17 | 逐处回改批／继承项纳管批／落地审计批／可移植性专项批：**工具随包发行**（发版闸 A–E、`layer_quotes_gate`／`check_layer_sync`／`check_instrument_coverage`＋配套脚本）、`init_workspace.py` 一键初始化；手册升到 v3.2（A-01…A-105） |
+| **v4.9.3** | **2026-09-18** | **本版**：**发行自足与跨平台**——`scripts/gates/` **27 件首次随包发行**（含 §21 三道闸 `gate_start.py`／`gate_stage.py`／`gate_checklist.py`）＋ **4 个配套脚本**（`yaml_check_generic.cjs`／`skill_probe_generic.mjs`／`w1b_*.mjs`）；发版闸由 A–E 升为 **A/B/C/D/D-配套/E/F**（新增"配套脚本必须随包"与"跨平台静态判据"）；node/js-yaml 解析链跨平台；`init_workspace` 上溯找包根＋两种布局取件；缺目录不再崩栈；手册 **v3.4**（A-106…A-118 共 13 条） |
 
-> **从哪装最省事**：一条命令 `dsh plugin add dsh-distillation-director`（npm）。**如果你的网络访问 npm 不畅**，用固定链接那条（路径 B），效果完全一样。
+> **从哪装最省事（v4.9.3 现状）**：用固定链接那条 `dsh plugin add https://github.com/winsonpong98-cloud/dsh-distillation-director/releases/latest/download/dsh-distillation-director.tgz`（路径 B）。**npm 通道目前仍是 4.6.6（缺 §21 闸），4.9.3 上架 npm 后本段会改回"一行直装"。**
 
 > **版本编号说明（v4.3 未独立发布）**：**`v4.3` 是跳过的编号，未独立发版**。v4.2.0 提交信息里的"v4.3"指**机器层脚本口径**、v4.6.4 提交信息里的"V4.3"指**防坑体系批次**，二者均非插件版本号；「防坑体系 37 条 ＋ 三件门禁」实际随 **v4.2.2** 收口轮交付。故编号自 v4.2.2 直接进入 v4.4.0。
 
@@ -180,3 +191,29 @@ AGPL-3.0-or-later（因 index.js 结构参考了同许可证的 dsh-cangjie-skil
   之后手册里的 `python tools\gate_start.py …` 等命令才能按原样执行。
 - **读全文再抄录**：`skill` 工具返回的正文可能被裁剪（实测省略 13,491 字节）。
   §21 的哈希核对与"逐字抄录 ≥12 条"**必须先读全文**（插件里的 `SKILL.md`），否则中部条款缺失、逐字对不上。
+
+---
+
+## v4.9.3 修掉的发行缺陷（发行自足，全部来自异机实测）
+
+本节与"v4.6.5 修掉的两个发行缺陷"同性质：**都不是功能问题，而是"在我这台机器上永远测不出来"的发行问题**。
+
+1. **§21 三道闸与整套门禁不随包发行**：`scripts/gates/` 此前 4.1.0–4.9.2 **一律缺失** ⇒ 手册 §21 写的
+   `python tools\gate_start.py --task <slug>` 在别人的机器上跑不起来（"未过不许调子代理"只能靠自觉）。
+   本版把 **27 件**随包发行，并在包内提供 `init_workspace.py` 一键装到你的工作区。
+2. **4 个配套脚本不随包**：`yaml_check_generic.cjs`（YAML 实解析）／`skill_probe_generic.mjs`（引擎加载器实测）／
+   `w1b_*.mjs` 原先只住在作者工作目录 ⇒ 新机器的 YAML 闸与引擎探针直接失效。本版入包（`scripts/`）。
+3. **发版闸判据只覆盖"最常见的一类依赖"**：原 D 判据只验"引用的 `.py` 在不在包里"，
+   对配套脚本／运行时目录／外部库（node／js-yaml）**全无覆盖** ⇒ 判据升级为
+   **A/B/C/D/D-配套/E/F**：新增**D-配套**（包内门禁引用的 WORK 文件必须在包内）与
+   **F 跨平台静态判据**（Windows 专有 API／硬写 `node.exe` 且无平台兜底）。
+4. **同步清单手写必然漏**：包内与权威源实测**漂移 7 个文件**（改了 `tools\` 却从没进包）。
+   修法＝同步清单**改为按包内实际发行文件自动生成**，并给数据文件（手册／执行单）单独加同步步。
+5. **初始化在发行包布局下算错包根**：原实现按固定跳数求插件根 ⇒ 发行包里算错两级、**一个文件都装不上**。
+   修法＝**上溯找包根**＋两种布局取件源；同时补齐 `.dsh\gate-kit` 配置目录。
+6. **平台写死与缺目录崩栈**：node 只认 `node.exe`（Linux／NAS 上引擎二进制叫 `node`）；
+   `os.listdir`／`cwd=` 在目录不存在时直接抛异常（新用户机器上必现）。两者均已修（解析链＋`_safe_listdir`）。
+
+**本版复验**：`repack` rc=0 ｜ 发版闸 rc=0（六判据全过）｜ `postflight` rc=0（连跑两次）｜
+`pitfall_audit --check` rc=0 ｜ `gate_selftest` rc=0 ｜ **异机安装实测 rc=0**（46 文件解到 `<DSH_HOME>/packages/`，
+引擎 `node` 加载 `index.js` → 注册技能 `distillation-director`）｜ **异机门禁模拟 11 项致命 0**。
