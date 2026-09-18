@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""9 维机器初评器 v2（试点 A 优化轮 · 零 LLM 本地 py）
+r"""9 维机器初评器 v2（试点 A 优化轮 · 零 LLM 本地 py）
+
+⚠ 本 docstring **必须是 raw 字符串**（前缀 `r`）：正文里含 `.dsh\skills\` 这类**反斜杠路径**，
+  非 raw 时 `\s` 是**无效转义**——Python 3.12 起报 `SyntaxWarning: invalid escape sequence '\s'`，
+  **Python 3.14 起将直接变成 `SyntaxError`**（2026-09-17 可移植性审计实测抓到；改权威源后须同步插件副本）。
 
 v2 = v1 + (1) d6 池 id 实存自动核验（家族约定文件自动发现）
         (2) test-prompts.json 盘点（供 d8 judge 快速定位）
@@ -75,25 +79,71 @@ def _is_host_skill(sp):
     return '.dsh' in parts and 'skills' in parts and parts.index('.dsh') < parts.index('skills')
 
 
+def _book_tree_names():
+    r"""原书树目录名的**候选集**：默认 `['投资蒸馏']`，可用环境变量 `DSH_DISTILL_BOOK_TREES` 覆盖
+    （分号分隔的多目录名）。
+
+    为什么可配（2026-09-17 可移植性审计 · A-78）：本器最初只为"投资线"写，把原书树目录名写死成
+    `投资蒸馏`。别的机器上这个目录名可能完全不同（或根本不存在）⇒ 反查全部落空，
+    **d6-c2/c3/c5 静默走 skip**（外观"无问题"，实则没检）。⇒ 改为可配 + **落空时显式说明**。
+    """
+    v = os.environ.get('DSH_DISTILL_BOOK_TREES', '').strip()
+    return [x.strip() for x in v.split(';') if x.strip()] if v else ['投资蒸馏']
+
+
 def _auto_book_base(slug):
-    """按 slug 在蒸馏树里反查原书册根（排除 snapshots/备份），找不到返回 None。"""
+    """按 slug 在**原书树**里反查原书册根（排除 snapshots/备份），找不到返回 None。
+
+    搜索根顺序：① 被检技能所在工作区（从 SKILL.md 路径上溯到 `.work`／技能根的同级）；
+    ② `BASE_DIR`（权威脚本所在工作区）。**不再假定只有一个目录名**（见 `_book_tree_names`）。
+    """
+    roots = []
+    for r in (BASE_DIR, _host_workspace_root()):
+        if r and r not in roots:
+            roots.append(r)
     hits = []
-    for cand in _g.glob(os.path.join(BASE_DIR, '投资蒸馏', '**', 'skills', slug, 'SKILL.md'), recursive=True):
-        if 'snapshots' in cand or '备份' in cand:
-            continue
-        hits.append(cand)
+    for root in roots:
+        for tree in _book_tree_names():
+            pat = os.path.join(root, tree, '**', 'skills', slug, 'SKILL.md')
+            for cand in _g.glob(pat, recursive=True):
+                if 'snapshots' in cand or '备份' in cand:
+                    continue
+                hits.append(cand)
+        if hits:
+            break
     if not hits:
         return None
     hits.sort(key=len)
     return os.path.dirname(os.path.dirname(os.path.dirname(hits[0])))
 
-def _host_skills_root(sp):
+
+def _host_workspace_root():
+    r"""从被检上下文反推宿主工作区根（用于在**别人的目录结构**里找原书树）。
+
+    判据：`<root>\.dsh\skills\<slug>\SKILL.md` 形状 → 返回 `<root>`。
+    由 `main()` 在解析参数后设置模块级 `_CUR_SKILL_PATH`；未设置时返回 None。
+    """
+    sp = globals().get('_CUR_SKILL_PATH')
+    if not sp:
+        return None
+    p = os.path.abspath(sp)
+    parts = p.split(os.sep)
+    for i in range(len(parts) - 1, 0, -1):
+        if parts[i] == 'skills' and parts[i - 1] == '.dsh':
+            return os.sep.join(parts[:i - 1])
+    return None
+
+
+def _host_skills_root(sp=None):
     r"""v4.4（2026-09-13）：从被检文件路径反推它所属的**宿主技能根**（取代硬编码金融宿主）。
 
     形状 `…\<宿主>\.dsh\skills\<slug>\SKILL.md` → 返回 `…\<宿主>\.dsh\skills`；
-    形状不符（非宿主技能）→ 返回 None，调用方回落到旧常量，保持向后兼容。
-    修因：旧版把"宿主实存集合"写死成金融投资宿主，对教育线 22 件造成 16 件 `d6-c1` **假扣分**。
+    形状不符（非宿主技能）→ 返回 None，调用方**自行决定**回落或跳过
+    （2026-09-17 起：调用方的硬编码本机兜底常量已删除，见 A-78）。
     """
+    sp = sp or globals().get('_CUR_SKILL_PATH')
+    if not sp:
+        return None
     parts = os.path.abspath(sp).split(os.sep)
     for i in range(len(parts) - 1, 0, -1):
         if parts[i] == 'skills' and parts[i - 1] == '.dsh':
@@ -454,13 +504,18 @@ def check_d6(lines, meta, skill_path):
     # v4.3 默认：宿主技能的"实存集合"不含原稿副本（引擎不加载原稿树；含进去会漏判归档死链）
     _skip_drafts = HOST_ONLY_REFS and host_skill
     if not _skip_drafts:
-        for cand in _g.glob(os.path.join(BASE_DIR, "投资蒸馏", "**", "skills", "*", "SKILL.md"), recursive=True):
-            found.add(os.path.basename(os.path.dirname(cand)))
+        # A-78（2026-09-17 可移植性审计）：原书树目录名**可配**（DSH_DISTILL_BOOK_TREES），
+        # 不再假定只叫 `投资蒸馏`——否则换台机器时这里恒为空集 ⇒ 全部引用被判"不存在"（假阳性）。
+        for _tree in _book_tree_names():
+            for cand in _g.glob(os.path.join(BASE_DIR, _tree, "**", "skills", "*", "SKILL.md"), recursive=True):
+                found.add(os.path.basename(os.path.dirname(cand)))
     # v4.1 补丁(2026-09-12)：宿主技能目录并入 found，消除"投资家族占位"注释依赖（backward-compatible）
-    # v4.4（2026-09-13）：宿主技能根改为**从被检文件反推**（修"硬编码金融宿主"缺陷）；
-    #   反推不到才回落到旧常量（旧行为不变，仅非宿主技能才会走到回落）。
-    host_skills = _host_skills_root(sp) or os.path.join(os.path.dirname(BASE_DIR), "金融投资", ".dsh", "skills")
-    if os.path.isdir(host_skills):
+    # v4.4（2026-09-13）：宿主技能根改为**从被检文件反推**（修"硬编码金融宿主"缺陷）。
+    # A-78（2026-09-17）：**删除硬编码本机兜底**（原为 `…\金融投资\.dsh\skills`）——
+    #   那既是"本机专属"（别人电脑上没有这个路径），又会**静默**把假路径当权威。
+    #   现改为：反推不到 ⇒ host_skills 为 None ⇒ 跳过这一步（并在报告里由 semantic_only_notes 说明）。
+    host_skills = _host_skills_root(sp) or _host_skills_root(globals().get('_CUR_SKILL_PATH'))
+    if host_skills and os.path.isdir(host_skills):
         for _n in os.listdir(host_skills):
             if os.path.isdir(os.path.join(host_skills, _n)):
                 found.add(_n)
@@ -579,12 +634,16 @@ def check_d6(lines, meta, skill_path):
     for x in re.findall(r"`([a-z][a-z0-9]*(?:-[a-z0-9]+)+)`", _doc):
         _refs.add(x)
     _tree, _host, _arch = set(), set(), set()
-    for _p in _g.glob(os.path.join(BASE_DIR, "投资蒸馏", "*", "skills", "*")):
-        if os.path.isdir(_p):
-            _tree.add(os.path.basename(_p))
-    # v4.4（2026-09-13）：同上，改为从被检文件反推宿主技能根（回落常量保持旧行为）。
-    _hroot = _host_skills_root(skill_path) or r"D:\deepseekharness\workspaces\金融投资\.dsh\skills"
-    if os.path.isdir(_hroot):
+    # A-78（2026-09-17 可移植性审计）：原书树目录名**可配**，不再写死 `投资蒸馏`。
+    for _tree_name in _book_tree_names():
+        for _p in _g.glob(os.path.join(BASE_DIR, _tree_name, "*", "skills", "*")):
+            if os.path.isdir(_p):
+                _tree.add(os.path.basename(_p))
+    # v4.4（2026-09-13）：同上，改为从被检文件反推宿主技能根。
+    # A-78（2026-09-17）：**删除硬编码本机兜底**（原为一个写死的本机绝对路径，指向某条线的工作区技能根）——
+    #   它是"本机专属"且会**静默**把假路径当权威（别人电脑上该路径不存在 ⇒ _host 恒为空 ⇒ 假 warn）。
+    _hroot = _host_skills_root(skill_path) or _host_skills_root(globals().get('_CUR_SKILL_PATH'))
+    if _hroot and os.path.isdir(_hroot):
         _host = {d for d in os.listdir(_hroot) if os.path.isdir(os.path.join(_hroot, d))}
         _ap = os.path.join(_hroot, "archived")
         if os.path.isdir(_ap):
@@ -779,6 +838,10 @@ def main():
     if "--book-base" in sys.argv:
         BOOK_BASE_OVERRIDE = sys.argv[sys.argv.index("--book-base") + 1]
     skill_path = sys.argv[1]
+    # A-78（2026-09-17 可移植性审计）：**把被检文件路径登记为模块级上下文**，
+    # 供 `_host_skills_root()`／`_auto_book_base()` 在**陌生目录结构**下反推宿主技能根与工作区根。
+    # 不设置它 ⇒ 反推恒失败 ⇒ 只能靠（已删除的）本机硬编码兜底 ⇒ 换台机器即失真。
+    globals()['_CUR_SKILL_PATH'] = os.path.abspath(skill_path)
     report = run(skill_path)
     out = None
     if "--out" in sys.argv:

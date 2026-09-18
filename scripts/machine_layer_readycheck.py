@@ -81,13 +81,49 @@ def check(skill_path, bookbase):
             "method_note": "v0.2（M7 修正）：由‘清单式自证’升级为**可核计数**（desc/R/引号/页锚/原文源与页数/步骤/检查点），计数随本文件落盘可复核。"}
 
 def main():
-    if len(sys.argv) < 3:
-        print(__doc__); sys.exit(2)
-    res = check(sys.argv[1], sys.argv[2])
-    if "--json" in sys.argv:
-        out = sys.argv[sys.argv.index("--json") + 1]
-        json.dump(res, open(out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    # A-78（2026-09-17 可移植性审计）：**显式参数解析 + 可读错误**。
+    #   旧版只判 `len(sys.argv) < 3`，随后直接 `open(sys.argv[1])`——
+    #   于是把选项名当文件名：`--task no-such-task` ⇒ `FileNotFoundError: '--task'` **裸 traceback**
+    #   （使用者看不出"该脚本不接受 --task，它要的是两个位置参数"）。换台机器时这种误用极常见。
+    argv = sys.argv[1:]
+    # 兼容 `--json <path>`（原设计），其余 `--x` 一律报错并打印用法
+    json_out = None
+    if '--json' in argv:
+        i = argv.index('--json')
+        if i + 1 >= len(argv):
+            sys.stderr.write('🔴 --json 缺少取值\n')
+            return 2
+        json_out = argv[i + 1]
+        argv = argv[:i] + argv[i + 2:]
+    if '-h' in argv or '--help' in argv:
+        print(__doc__)
+        return 0
+    bad = [x for x in argv if x.startswith('-')]
+    if bad:
+        sys.stderr.write('🔴 不认识选项：%s\n'
+                         '   本脚本**只接受两个位置参数**：`<SKILL.md> <bookbase>`'
+                         '（可选 `--json <out.json>`）。\n'
+                         '   例：python machine_layer_readycheck.py "<技能件>/SKILL.md" "<原书册根>" --json out.json\n'
+                         % ' '.join(bad))
+        return 2
+    if len(argv) < 2:
+        print(__doc__)
+        return 2
+    skill_path, bookbase = argv[0], argv[1]
+    if not os.path.isfile(skill_path):
+        sys.stderr.write('🔴 第 1 个位置参数应为**存在的 SKILL.md 路径**，实测不存在：%s\n' % skill_path)
+        return 2
+    if not os.path.isdir(bookbase):
+        sys.stderr.write('🔴 第 2 个位置参数应为**存在的原书册根目录**，实测不存在：%s\n'
+                         '   （本脚本用它找 `parts/` 等可核对原文；无册根时该闸会判"不适用"，'
+                         '但路径本身必须先存在）\n' % bookbase)
+        return 2
+    res = check(skill_path, bookbase)
+    if json_out:
+        with open(json_out, "w", encoding="utf-8") as f:
+            json.dump(res, f, ensure_ascii=False, indent=1)
     print(json.dumps(res, ensure_ascii=False, indent=1))
+    return 0
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

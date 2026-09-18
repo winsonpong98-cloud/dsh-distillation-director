@@ -1,0 +1,49 @@
+{
+  "_说明": [
+    "引文型附属文件零问题闸（通用版）· 每册配置模板（**不含任何册的私有数据**，只有字段说明与两份样例形态）",
+    "用法：拷成 .work/<task>/layer-quotes-<task>.json 并按本册填写；",
+    "     然后 python tools\\layer_quotes_gate.py --task <task>（缺配置 ⇒ rc=1，**绝不回落其它册**）。"
+  ],
+  "_字段说明": {
+    "layer": "附属层目录（相对 .work/<task>/；递归扫）",
+    "pattern": "附属文件 glob",
+    "pool_glob": "候选池 glob（引文与锚的权威来源）",
+    "anchor_regex": "锚正则；命名组 (?P<id>...)＝候选 id，(?P<page>...)＝页号",
+    "quote_source": "inline_quote（行内引号）｜pool_entry（引文取自池条目）",
+    "quote_chars": "[左引号, 右引号]",
+    "min_quote_len": "参与判定前的最短归一化长度",
+    "unparsable_allow": "允许的不可解析锚行数上限（0＝一条都不许；有白名单须逐条登记）",
+    "strict_anchor_on_quote_line": "引文行上找不到锚时是否计入不可解析",
+    "pages": {
+      "mode": "file_per_page（每页一文件）｜single_file_pagemarks（单文件＋页标记）",
+      "file": "single_file_pagemarks：源文件名",
+      "pagemark": "页标记形态（auto＝交给 verify_candidates.detect_pagemark 唯一权威探测）",
+      "dir": "file_per_page：页文件目录",
+      "file_pattern": "file_per_page：命名（%s＝源代号，%04d＝页号）"
+    }
+  },
+  "_样例A_候选id锚_单文件分页": {
+    "layer": "skills",
+    "pattern": "**/*.md",
+    "pool_glob": "candidates/notes_*.md",
+    "anchor_regex": "（`(?P<id>[A-Za-z]+-\\d{3})`\\s*s(?P<page>\\d{1,4})[^）]*）",
+    "quote_source": "inline_quote",
+    "quote_chars": ["「", "」"],
+    "min_quote_len": 8,
+    "unparsable_allow": 0,
+    "strict_anchor_on_quote_line": false,
+    "pages": {"mode": "single_file_pagemarks", "file": "book_text.md", "pagemark": "auto"}
+  },
+  "_样例B_书别名锚_每页一文件": {
+    "layer": "skills/<某件>/references",
+    "pattern": "专业层-*.md",
+    "pool_glob": "candidates/notes_*.md",
+    "anchor_regex": "【(?P<src>[^】]{0,120}?)PDF\\s*(?P<page>p[\\d\\s、,，–\\-~—p]*?)】",
+    "quote_source": "inline_quote",
+    "quote_chars": ["「", "」"],
+    "min_quote_len": 8,
+    "unparsable_allow": 0,
+    "strict_anchor_on_quote_line": true,
+    "pages": {"mode": "file_per_page", "dir": "ocr", "file_pattern": "%s_p%04d.txt"}
+  }
+}

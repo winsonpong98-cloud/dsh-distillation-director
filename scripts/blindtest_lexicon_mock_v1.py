@@ -1,58 +1,59 @@
 # -*- coding: utf-8 -*-
-"""盲测闸 词表命中模拟器 v1（零 LLM 本地 py · 初判用）
+r"""盲测闸 词表命中模拟器 v1（零 LLM 本地 py · 初判用）
 
-目标：description 触发词表 对 用户路由 prompt 做字面命中初判，筛掉“机械可判”路由；
-无字面锚/弱命中/邻族抢单 的 prompt 显式标记 needs_llm=True，交 LLM judge 结构化表
-（13x{命中/目标/邻族风险}，单发小批）——对应三闸方案里盲测的机器初判层。
+目标：description 触发词表 对 用户路由 prompt 做字面命中初判，筛掉"机械可判"路由；
+无字面锚/弱命中/邻族抢单 的 prompt 显式标记 needs_llm=True，交 LLM judge 结构化表。
 
-验收基准：反脆弱册 blind-test-report.md 的 12 条路由盲测（AD-1..6 / OC-1..6），
-judge 结论=9 干脆 + 3 边界存疑（AD-3/OC-4/OC-5）+ 2 判停（AD-6/OC-6）。
+═══ 设计铁律：**本脚本不得含任何一本书的数据**（2026-09-17 用户拍板 · 《避坑手册》A-74）═══
+历史（如实留档，两轮才做对）：
+  · v1：`BOOKS`／`SKILLS` 里**硬编码了三本书的绝对路径**（形如 `<工作区>\<册目录>\…`），
+    并把某册的 12 条路由题**内嵌成默认 fixture** ⇒ ① 换机即失效（路径只在本机存在）；
+    ② "没给 --prompts"时**静默拿那一册的题出报告**（产出的是**别的书**的证据，A-37）。
+  · v2：真实现了 `--prompts`／`--skills-root` 成对开关，**但没有删掉内嵌的书名与路径**——
+    默认分支仍指向那三册。**"抽了开关却没删数据"＝没通用化**（A-74）。
+  · v3（当前）：**删除全部书别数据**——没有 BOOKS／SKILLS 常量、没有内嵌书目标题、
+    没有默认 fixture。语料与词表**必须由调用者给出**，否则直接退出并打印用法。
 
 用法：
-  python blindtest_lexicon_mock_v1.py
-  python blindtest_lexicon_mock_v1.py --prompts <json>   （覆盖内嵌 fixture）
-产物：blindtest-mock-v1.json + 盲测词表模拟器v1-试点报告.md（同目录）
+  # 正式用（成对给出，缺一即拒跑）
+  python blindtest_lexicon_mock_v1.py --prompts <probes.json> --skills-root <技能根> [--out <目录>]
+  # 自证（不依赖任何外部语料；用通用占位题与合成词表验证判定逻辑，含两例已知正负样本）
+  python blindtest_lexicon_mock_v1.py --self-test
+
+  `--prompts` 期望：顶级数组，或含 `probes`／`prompts`／`rows`／`items`／`cases` 键的对象；
+  每条至少 `{"prompt": "…"}`，可选 `id`／`target`（别名 `expect_top1`／`owner_skill`）／`judge_class`。
+
+产物（写到 `--out`，缺省＝当前目录，**不再写进工具目录**以免污染脚本同步/打包新鲜度闸）：
+  blindtest-mock-v1.json ＋ 盲测词表模拟器v1-报告.md
 """
 import os
 import re
 import sys
 import json
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(os.path.dirname(HERE))
-TT = os.path.join(ROOT, "投资蒸馏", "塔勒布五部曲")
-BOOKS = {
-    "反脆弱": os.path.join(TT, "反脆弱"),
-    "股票大作手回忆录": os.path.join(ROOT, "投资蒸馏", "股票大作手回忆录"),
-    "寻找鱼多的池塘": os.path.join(ROOT, "投资蒸馏", "寻找鱼多的池塘"),
-}
-SKILLS = {
-    "antifragile-designer": os.path.join(BOOKS["反脆弱"], "skills", "antifragile-designer", "SKILL.md"),
-    "optionality-convexity": os.path.join(BOOKS["反脆弱"], "skills", "optionality-convexity", "SKILL.md"),
-    "trader-discipline": os.path.join(BOOKS["股票大作手回忆录"], "skills", "trader-discipline", "SKILL.md"),
-    "market-structure-and-manipulation": os.path.join(BOOKS["股票大作手回忆录"], "skills", "market-structure-and-manipulation", "SKILL.md"),
-    "multi-asset-rotation": os.path.join(BOOKS["寻找鱼多的池塘"], "skills", "multi-asset-rotation", "SKILL.md"),
-    "convertible-pool-rotation": os.path.join(BOOKS["寻找鱼多的池塘"], "skills", "convertible-pool-rotation", "SKILL.md"),
-    "fund-selector": os.path.join(BOOKS["寻找鱼多的池塘"], "skills", "fund-selector", "SKILL.md"),
-    "investing-mindset": os.path.join(BOOKS["寻找鱼多的池塘"], "skills", "investing-mindset", "SKILL.md"),
-}
+# ⚠ 本文件**不得**出现：书名、某册的目录名、任何绝对路径常量、任何一册的题目。
+#    （巡检：`python tools\\scan_plugin_payload.py`；期望本文件零【甲】类命中）
 
-# 判停红线词（时点预测等；盲测 AD-6/OC-6）
-REDLINE = ["什么时候会", "何时发生", "何时会", "会不会崩", "会不会涨", "会崩", "会跌", "预测", "明天", "涨跌", "提前跑", "逃顶", "抄底", "会涨吗"]  # v1.1：移除裸词“什么时候/何时”（会把“什么时候能拆线”误判为时点预测），见规范对比实验 sge-3 案例
+# 判停红线词（时点预测等）。**注**：这是**投资域**口径；换域时须另备域内词表
+#（通用替代见 `tools\\blindtest_generic.py`）。用 `--lexicon-domain` 可在产物里声明域。
+REDLINE = ["什么时候会", "何时发生", "何时会", "会不会崩", "会不会涨", "会崩", "会跌", "预测", "明天", "涨跌", "提前跑", "逃顶", "抄底", "会涨吗"]  # v1.1：移除裸词"什么时候/何时"（会把"什么时候能拆线"误判为时点预测）
 
-FIXTURES = [
-    {"id": "AD-1", "target": "antifragile-designer", "judge_class": "clear", "prompt": "家庭财务就怕是裁员这种打击，怎么让我的职业收入不怕黑天鹅？"},
-    {"id": "AD-2", "target": "antifragile-designer", "judge_class": "clear", "prompt": "我现在零冗余、满负荷、效率极高，但总觉得哪里不对，是不是越优化越脆？"},
-    {"id": "AD-3", "target": "antifragile-designer", "judge_class": "boundary", "prompt": "我吃一堆保健品、每年全套体检来防病，这种过度保护是不是反而有害？"},
-    {"id": "AD-4", "target": "antifragile-designer", "judge_class": "clear", "prompt": "这本书刚出版就火了，值不值得买来学？新公司值不值得追？"},
-    {"id": "AD-5", "target": "antifragile-designer", "judge_class": "clear", "prompt": "我严格按计划、全面求稳，反而越来越脆，为什么越优化越脆？"},
-    {"id": "AD-6", "target": "antifragile-designer", "judge_class": "decline", "prompt": "股市房价什么时候会崩，我想提前跑。"},
-    {"id": "OC-1", "target": "optionality-convexity", "judge_class": "clear", "prompt": "10 个创业公司死 9 个，成了赚 50 倍，要不要拿全部积蓄投？"},
-    {"id": "OC-2", "target": "optionality-convexity", "judge_class": "clear", "prompt": "我胜率不到 40%，是不是方法不行该放弃？"},
-    {"id": "OC-3", "target": "optionality-convexity", "judge_class": "clear", "prompt": "小仓位试错和赌博有什么区别？"},
-    {"id": "OC-4", "target": "optionality-convexity", "judge_class": "boundary", "prompt": "这只基金十年年年正收益，历史数据这么好，能不能重仓？"},
-    {"id": "OC-5", "target": "optionality-convexity", "judge_class": "boundary", "prompt": "波动太大我睡不着，要不要降仓位、降波动？"},
-    {"id": "OC-6", "target": "optionality-convexity", "judge_class": "decline", "prompt": "预测比特币明天涨跌，涨了我就全仓跟。"},
+# ── 自证样本（**通用占位，不含任何书别数据**）────────────────────────────────
+# 用途：机器证明"判定逻辑没坏"（机械命中／无锚需 LLM／红线判停／并列歧义 四种形态各一）。
+# 它不是"某个任务的语料"，故可长期留在脚本里；**换域词表须另配**（见上方 REDLINE 注）。
+SELFTEST_LEXICON = {
+    "skill-alpha": ["预算", "现金流", "应急金", "负债率"],
+    "skill-beta": ["复盘", "决策记录", "检查清单"],
+}
+SELFTEST_PROBES = [
+    {"id": "ST-1", "target": "skill-alpha", "judge_class": "clear",
+     "prompt": "家里应急金该存多少，怎么按负债率和现金流算？", "expect": "mechanical-clear"},
+    {"id": "ST-2", "target": "skill-beta", "judge_class": "clear",
+     "prompt": "我总在同一个地方栽跟头，怎么做决策记录和复盘？", "expect": "mechanical-clear"},
+    {"id": "ST-3", "target": None, "judge_class": "boundary",
+     "prompt": "今天天气不错适合散步吗？", "expect": "no-lexicon-hit"},
+    {"id": "ST-4", "target": None, "judge_class": "decline",
+     "prompt": "预测一下明天大盘涨跌，我想提前跑。", "expect": "redline-decline"},
 ]
 
 
@@ -72,13 +73,15 @@ def read_description(path):
         elif active and ln.startswith((" ", "\t")):
             desc.append(ln.strip())
     text = " ".join(desc)
-    if text.startswith("") and text.endswith("") and len(text) >= 2:
+    if text.startswith("'") and text.endswith("'") and len(text) >= 2:
+        text = text[1:-1]
+    elif text.startswith('"') and text.endswith('"') and len(text) >= 2:
         text = text[1:-1]
     return text
 
 
 def extract_lexicon(desc):
-    """v1.2（对比实验 v3.1 优化）：词源=整段 description（触发词段+何时用/何时不用+引号话术示例），
+    """词源=整段 description（触发词段＋何时用/何时不用＋引号话术示例），
     去括号后按标点/引号/斜杠/空格切词；2..16 字为 token（超长整句跳过防噪声）。"""
     seg = re.sub(r"[（(][^）)]*[）)]", "", desc)
     toks = re.split(r"['\"、，,；;/|｜\s：:。！？!?—…]+", seg)
@@ -92,32 +95,8 @@ def extract_lexicon(desc):
     return out[:200]
 
 
-def build_lexicons():
-    lex = {}
-    for slug, path in SKILLS.items():
-        desc = read_description(path)
-        lex[slug] = extract_lexicon(desc)
-    return lex
-
-
-# ---- 通用化（A-37 修复 · 2026-09-13）------------------------------------------------
-# 病根：docstring 写着 `--prompts <json>`，**代码里从未实现**（`prompts = FIXTURES` 无条件），
-# 于是「换一本书跑盲测」会**静默地**拿内嵌的反脆弱册 fixture 出报告 —— 产出的是**另一本书的证据**。
-# 修法：① 真实现 --prompts；② 词表语料必须由 --skills-root 显式给出并与 prompts 同批（否则拒跑）；
-#       ③ 输出目录 --out（不再写死在工具目录，避免污染脚本同步/打包新鲜度闸）；④ 语料来源写进产物。
-def parse_args():
-    a = sys.argv[1:]
-    out = {}
-    for k in ('--prompts', '--skills-root', '--out'):
-        if k in a:
-            i = a.index(k) + 1
-            if i >= len(a):
-                sys.exit('🔴 %s 缺少取值' % k)
-            out[k[2:].replace('-', '_')] = a[i]
-    return out
-
-
 def build_lexicons_from_root(root):
+    """从**调用者给出的技能根**建词表（每件取 `<root>/<slug>/SKILL.md` 的 description）。"""
     lex = {}
     if not os.path.isdir(root):
         sys.exit('🔴 --skills-root 不是目录：%s' % root)
@@ -145,7 +124,7 @@ def load_prompts(path):
             sys.exit('🔴 --prompts 条目缺 prompt 字段：%r' % (it,))
         it = dict(it)
         it.setdefault('id', '?')
-        # 目标件别名（A-37）：本库 test-prompts 用 expect_top1／owner_skill，投资册用 target
+        # 目标件别名：有的库用 expect_top1／owner_skill，有的用 target
         if not it.get('target'):
             it['target'] = it.get('expect_top1') or it.get('owner_skill')
         it.setdefault('judge_class', 'unknown')
@@ -164,14 +143,13 @@ def judge_prompt(prompt, lexicons):
     best = max(scores.values()) if scores else 0
     tops = [s for s, v in scores.items() if v > 0]
     if best > 0:
-        second = sorted(scores.values(), reverse=True)[1] if len(scores) > 1 else 0
         rivals = [s for s in tops if s != (tops[0] if tops else None) and scores[s] >= best * 0.6] if tops else []
     else:
         rivals = []
     tie = best > 0 and any(s != (tops[0] if tops else None) and scores[s] == best for s in tops)
     if red:
         verdict = "redline-decline"
-        needs_llm = False  # 判停本身机器即可给（红灯），语义复核可选
+        needs_llm = False          # 判停本身机器即可给（红灯）；语义复核可选
     elif best == 0:
         verdict = "no-lexicon-hit"
         needs_llm = True
@@ -189,39 +167,31 @@ def judge_prompt(prompt, lexicons):
     }
 
 
-def main():
-    args = parse_args()
-    if bool(args.get('prompts')) != bool(args.get('skills_root')):
-        sys.exit('🔴 --prompts 与 --skills-root 必须成对给出（A-37：只给 prompts ⇒ 词表仍取自**内嵌的另'
-                 '一本书**语料，会静默产出跨书假证据）')
-    if args.get('prompts'):
-        prompts = load_prompts(args['prompts'])
-        psrc = args['prompts']
-        lexicons = build_lexicons_from_root(args['skills_root'])
-        lsrc = args['skills_root']
-        if not lexicons:
-            sys.exit('🔴 --skills-root 下未找到任何 <slug>/SKILL.md：%s' % lsrc)
-        targets = {p['target'] for p in prompts if p.get('target')}
-        miss = sorted(targets - set(lexicons))
-        if miss:
-            sys.exit('🔴 prompts 的 target 不在词表语料内：%s ⇒ **语料不匹配**（A-37），拒绝产出'
-                     '（词表语料：%s）' % (miss, sorted(lexicons)[:8]))
-    else:
-        prompts, psrc = FIXTURES, '内嵌 fixture（反脆弱册 AD/OC 12 题）'
-        lexicons, lsrc = build_lexicons(), '内嵌 BOOKS（投资蒸馏三册）'
-    outdir = args.get('out') or HERE
-    if not os.path.isdir(outdir):
-        sys.exit('🔴 --out 不是目录：%s' % outdir)
-    print('# 语料来源：prompts=%s ｜ 词表=%s ｜ 共 %d 题' % (psrc, lsrc, len(prompts)))
-    print('# ⚠ 红线词表口径：内嵌 REDLINE＝**投资域（时点预测）**专用；'
-          + ('本次为**外域语料**，判停红线须另备域内词表（本域用 tools/blindtest_generic.py），'
-             '本行的 redline 计数**不得**当作判停结论。' if args.get('prompts') else '内嵌 fixture 同域，可用。'))
-    rows = []
-    for fx in prompts:
-        r = judge_prompt(fx["prompt"], lexicons)
-        r.update({"id": fx["id"], "target": fx["target"], "judge_class": fx["judge_class"],
-                  "prompt": fx["prompt"]})
-        rows.append(r)
+def parse_args():
+    a = sys.argv[1:]
+    flags = ('--self-test',)
+    out = {}
+    for k in flags:
+        if k in a:
+            out[k[2:].replace('-', '_')] = True
+    for k in ('--prompts', '--skills-root', '--out', '--lexicon-domain'):
+        if k in a:
+            i = a.index(k) + 1
+            if i >= len(a):
+                sys.exit('🔴 %s 缺少取值' % k)
+            out[k[2:].replace('-', '_')] = a[i]
+    return out
+
+
+USAGE = """用法：
+  python blindtest_lexicon_mock_v1.py --prompts <probes.json> --skills-root <技能根> [--out <目录>]
+  python blindtest_lexicon_mock_v1.py --self-test        # 不依赖外部语料，验证判定逻辑
+
+⚠ 本脚本**不含任何一本书的数据**：语料（prompts）与词表（skills-root）**必须由你给出**。
+  缺任一项即退出（早先版本会用内嵌的某一册语料静默出报告 ⇒ 产出别的书的证据，A-37/A-74）。"""
+
+
+def emit(rows, lexicons, psrc, lsrc, outdir, domain_note=''):
     stats = {
         "total": len(rows),
         "judge_clear": sum(1 for r in rows if r["judge_class"] == "clear"),
@@ -235,15 +205,17 @@ def main():
     out = {"schema": "blindtest-lexicon-mock-v1", "prompt_source": psrc, "lexicon_root": lsrc,
            "lexicon_sizes": {k: len(v) for k, v in lexicons.items()},
            "rows": rows, "stats": stats}
+    os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, "blindtest-mock-v1.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
-    # ---- md ----
     L = []
     A = L.append
     A("# 盲测闸 词表命中模拟器 v1 —— 机器初判（%d 题）" % len(rows))
     A("")
     A("> 语料来源：prompts=`%s` ｜ 词表=`%s`" % (psrc, lsrc))
     A("> 角色：盲测 LLM judge 的机器初判层（词表命中，零 LLM）")
+    if domain_note:
+        A("> ⚠ 红线词表域声明：%s" % domain_note)
     A("")
     A("## 一、语料与词表")
     A("")
@@ -257,7 +229,8 @@ def main():
     for r in rows:
         top_txt = (r["top"] + "(" + str(r["scores"].get(r["top"], 0)) + ")") if r["top"] else "—"
         rival_txt = ",".join(r["rivals"]) if r["rivals"] else "—"
-        A("| %s | %s | %s | %s | %s | %s |" % (r["id"], r["judge_class"], r["verdict"], r["needs_llm"], top_txt, rival_txt))
+        A("| %s | %s | %s | %s | %s | %s |" % (r["id"], r["judge_class"], r["verdict"],
+                                              r["needs_llm"], top_txt, rival_txt))
     A("")
     A("## 三、统计")
     A("")
@@ -269,21 +242,87 @@ def main():
     A("| 判停红线机器命中 | %d/%d（judge_class=decline 的题） |" % (stats["machine_redline"], _nd))
     A("| 词表 top1 = 期望目标技能 | %d/%d |" % (stats["top_is_target"], len(rows)))
     A("")
-    A("## 四、结论（v1 数据）")
+    A("## 四、已知缺口（v2 候选）")
     A("")
-    A("- 机器初判层的价值=先筛：机械可判的路由（verdict=mechanical-clear 且 top1=目标）可免 LLM；其余（无锚/弱锚/邻族抢单）才进 LLM 语义判定，输入从 12 条全量降到 needs_llm 子集。")
-    A("- 与 judge 盲测报告的印证与差异：AD-3/OC-5 无（弱）字面锚 → needs_llm（与报告边界结论一致）；OC-4 现词表已含 重仓/回测/年年正收益/历史数据（报告改进建议 1 已落地）→ 机器机械命中；AD-4「值不值得追」与触发词「值不值得追新」差一字漏字面命中（词元化留 v2）。")
-    A("- 已知缺口（v2 候选）：词表只取 description 触发词段，未用 何时用/何时不用 语义区；同义改写（保健品/体检 vs 过度保护）命中不了；判停红线目前只覆盖时点类。")
+    A("- 词表只取 description 全文切词，未单独利用「何时用／何时不用」语义区；")
+    A("- 同义改写（如口语化表述 vs 书内术语）命中不了，须交 LLM judge；")
+    A("- 红线词表为**投资域（时点预测）**口径，换域须另备词表（通用替代：`tools/blindtest_generic.py`）。")
     A("")
     md = "\n".join(L)
-    md_path = os.path.join(outdir, "盲测词表模拟器v1-试点报告.md")
+    md_path = os.path.join(outdir, "盲测词表模拟器v1-报告.md")
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(md)
     print(json.dumps(stats, ensure_ascii=False))
     for r in rows:
-        print("%s %-7s %-20s llm=%-5s top=%s" % (r["id"], r["judge_class"], r["verdict"], r["needs_llm"], (r["top"] or "—")[:26]))
+        print("%s %-7s %-20s llm=%-5s top=%s" % (r["id"], r["judge_class"], r["verdict"],
+                                                 r["needs_llm"], (r["top"] or "—")[:26]))
     print("md ->", md_path)
+    return stats
+
+
+def self_test(outdir):
+    """不依赖任何外部语料：用通用占位词表＋占位题验证四种判定形态（含正负样本）。"""
+    print('# 自证模式：语料＝脚本内**通用占位**样本（不含任何书别数据）')
+    rows = []
+    for pr in SELFTEST_PROBES:
+        r = judge_prompt(pr["prompt"], SELFTEST_LEXICON)
+        r.update({"id": pr["id"], "target": pr["target"], "judge_class": pr["judge_class"],
+                  "prompt": pr["prompt"]})
+        rows.append((r, pr["expect"]))
+    ok = 0
+    for r, want in rows:
+        good = (r["verdict"] == want)
+        ok += good
+        print('  %s %s 期望=%s 实测=%s（top=%s）' % ('✔' if good else '🔴', r["id"], want,
+                                                    r["verdict"], r["top"] or '—'))
+    emit([r for r, _ in rows], SELFTEST_LEXICON, '（自证：脚本内通用占位样本）',
+         '（自证：脚本内通用占位词表）', outdir,
+         domain_note='自证样本，非真实域；红线条目仅用于验证判定分支')
+    print('自证：%d/%d 形态符合预期 ⇒ %s' % (ok, len(rows), '✔ 通过' if ok == len(rows) else '🔴 判定逻辑有变'))
+    return 0 if ok == len(rows) else 1
+
+
+def main():
+    args = parse_args()
+    if args.get('self_test'):
+        return self_test(args.get('out') or os.getcwd())
+
+    hp, hs = bool(args.get('prompts')), bool(args.get('skills_root'))
+    if not hp and not hs:
+        print(USAGE)
+        return 2
+    if hp != hs:
+        sys.exit('🔴 --prompts 与 --skills-root 必须**成对**给出。\n'
+                 '   （早先只给 prompts 时，词表会取自**别的书的内嵌语料**，静默产出跨书假证据；A-37）\n\n' + USAGE)
+
+    prompts = load_prompts(args['prompts'])
+    lexicons = build_lexicons_from_root(args['skills_root'])
+    if not lexicons:
+        sys.exit('🔴 --skills-root 下未找到任何 <slug>/SKILL.md：%s' % args['skills_root'])
+    targets = {p['target'] for p in prompts if p.get('target')}
+    miss = sorted(targets - set(lexicons))
+    if miss:
+        sys.exit('🔴 prompts 的 target 不在词表语料内：%s ⇒ **语料不匹配**（A-37），拒绝产出'
+                 '（词表语料前 8 个：%s）' % (miss, sorted(lexicons)[:8]))
+
+    outdir = args.get('out') or os.getcwd()
+    if not os.path.isdir(outdir):
+        sys.exit('🔴 --out 不是目录：%s' % outdir)
+    print('# 语料来源：prompts=%s ｜ 词表=%s ｜ 共 %d 题'
+          % (args['prompts'], args['skills_root'], len(prompts)))
+    domain_note = args.get('lexicon_domain') or (
+        '内嵌 REDLINE＝**投资域（时点预测）**口径；若本次语料属他域，'
+        '红线条目的判停结论**不得**直接采信，须另备域内词表（通用替代：tools/blindtest_generic.py）')
+    print('# ⚠ %s' % domain_note)
+    rows = []
+    for fx in prompts:
+        r = judge_prompt(fx["prompt"], lexicons)
+        r.update({"id": fx["id"], "target": fx["target"], "judge_class": fx["judge_class"],
+                  "prompt": fx["prompt"]})
+        rows.append(r)
+    emit(rows, lexicons, args['prompts'], args['skills_root'], outdir, domain_note)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
