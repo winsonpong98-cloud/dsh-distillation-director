@@ -598,8 +598,35 @@ def main():
                 '🔴 ' + (' ｜ '.join(_tail) or 'rc=%s' % _rcb), False,
                 'A-132：内联波段 id 语法 ⇒ 换册即假红/假绿')
 
+    # ⑭ 随包清单双向比对（A-137 根治 · 2026-09-19 挂入 · 只读）
+    #   依据（真机实测）：`tar -xzf` 覆盖解包**只增改、不删除** ⇒ 把文件移出包后，
+    #   **装过旧版的机器上它照样留着**（实测：434 KB 内部手册与历史手册 4 件仍在）
+    #   ⇒ "不再随包" ≠ "已从用户机器上消失"，而症状是"**我明明删了**"这种最容易被相信的假象。
+    #   单向判据（"该有的在不在"）永远查不出它 ⇒ 本项是**双向**：缺件／**陈旧件**／内容不符。
+    print('\n⑭ 随包清单双向比对（A-137 · 只读）')
+    _pm = os.path.join(TOOLS, 'verify_pack_manifest.py')
+    _plug = os.path.join(ROOT, 'distillation-director-plugin')
+    if not os.path.exists(_pm):
+        rec('manifest:比对闸在位(A-137)', '闸在位', '🔴 缺 tools\\verify_pack_manifest.py',
+            False, 'A-137：没有清单比对闸 ⇒ 陈旧件无人发现')
+    else:
+        _rc1, _so1, _ = run([sys.executable, _pm, '--self-test'])
+        _ok1 = ('自证通过' in _so1) and _rc1 == 0
+        rec('manifest:闸自证(A-137)', '四类坏样本全拦（rc=0）',
+            ('✔ 自证通过' if _ok1 else '🔴 见输出'), _ok1,
+            'A-137：闸必须先证明能拦"缺件/陈旧件/内容不符/忽略项不误报"')
+        if os.path.isdir(_plug):
+            _rc2, _so2, _ = run([sys.executable, _pm, '--pkg-dir', _plug])
+            _m = re.search(r'陈旧件（目录有、清单无）\*\* (\d+) 项', _so2)
+            _ok2 = _rc2 == 0
+            rec('manifest:插件目录≡清单(A-137)', '缺 0 ／ 陈旧 0 ／ 内容不符 0',
+                ('✔ 逐项一致' if _ok2 else '🔴 陈旧 %s 项（见输出）' % (_m.group(1) if _m else '?')),
+                _ok2, 'A-137：插件目录里不该有"清单之外"的残留（旧版遗留／编译产物／一次性脚本）')
+        else:
+            rec('manifest:插件目录≡清单(A-137)', '插件目录不存在 ⇒ 不适用', '跳过（不适用）', True, '')
+
     bad = [r for r in results if r['verdict'] == 'FAIL']
-    print('\n结论：%s' % ('✔ 改后门禁全绿（%d 项检查 · 含⑧教育线四闸＋⑨子模式自检＋⑩格式判据活性＋⑪Windows .cmd/退出码判空＋⑫写死版号巡检＋⑬波段 id 单源）' % len(results) if not bad
+    print('\n结论：%s' % ('✔ 改后门禁全绿（%d 项检查 · 含⑧教育线四闸＋⑨子模式自检＋⑩格式判据活性＋⑪Windows .cmd/退出码判空＋⑫写死版号巡检＋⑬波段 id 单源＋⑭随包清单双向）' % len(results) if not bad
                         else '🔴 %d 项不符，不得宣布"改完"' % len(bad)))
     for r in bad:
         print('   - %s：期望 %s ／ 实测 %s' % (r['gate'], r['expect'], r['actual']))

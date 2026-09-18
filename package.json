@@ -1,8 +1,8 @@
 {
  "name": "dsh-distillation-director",
- "version": "4.9.9",
+ "version": "4.9.10",
  "license": "AGPL-3.0-or-later",
- "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.9.9：**发布面瘦身**——完整内部手册与历史手册**不再随包发行**（只留作者本地），随包改发**通用要点版《防坑要点-TOP20》**（零书身份／环境／金额）；并清除随包文件里的书目身份痕迹（内部任务名 155 处 ⇒ 0），把四处「册别默认值」改为**配置驱动/强制参数**（A-74）；发版闸新增**反向判据**：包内不得出现内部手册或历史手册，且通用要点版必须在场）",
+ "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.9.10：**随包清单 ＋ 安装侧双向比对**（A-137 根治）——覆盖解包只增改不删除，「把文件移出包」在装过旧版的机器上不生效（实测 434 KB 内部手册仍留）⇒ 包内新增自动生成的成员清单 scripts/gates/_pack-manifest.txt ＋ 新闸 verify_pack_manifest.py 做双向比对（缺件／陈旧件／内容不符，含 4 类坏样本自证），挂 postflight ⑭、由 verify_plugin_pack 断言「清单 ≡ 包内成员」；并补掉 extractors 模板里最后一处真书身份、把 SKILL.md 里「估算当实测」的成本口径更正）",
  "keywords": [
   "dsh-plugin",
   "deepseek-harness",

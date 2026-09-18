@@ -230,7 +230,14 @@ def main():
         CAT_MD = os.path.join(ROOT, '输出', '口径登记单-2026-09-12.md')
         # 端到端校验要一个具体 tgz：**自动取版本号最大的扁平版**（不写死版本，见 C-9 写死路径巡检）
         import glob as _glob
-        _tgzs = sorted(_glob.glob(os.path.join(ROOT, 'dsh-distillation-director-v*.tgz')))
+        # ⚠ 自伤（2026-09-19 实测抓到）：原写 `sorted(glob)[-1]` —— **字符串序**下
+        #   `…-v4.9.9.tgz` **大于** `…-v4.9.10.tgz`（'9' > '1'）⇒ 端到端校验**拿的是上一版的包**，
+        #   而该项内含"version 期望＝当前版本"的断言 ⇒ **假红**（实测报 v4.9.9「期望 4.9.10」）。
+        #   **教训：版本号一律按"数字段"排序，绝不按字符串。**
+        def _vkey(_p):
+            _m = re.search(r'-v(\d+)\.(\d+)\.(\d+)\.tgz$', os.path.basename(_p))
+            return tuple(int(x) for x in _m.groups()) if _m else (0, 0, 0)
+        _tgzs = sorted(_glob.glob(os.path.join(ROOT, 'dsh-distillation-director-v*.tgz')), key=_vkey)
         FLAT_TGZ = _tgzs[-1] if _tgzs else ''
         # 闸型：真跑，逐条比对**期望退出码**（零写业务文件，或只写 %TEMP%/.work/tools 沙箱）
         gates = [

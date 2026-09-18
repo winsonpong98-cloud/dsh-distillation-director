@@ -154,6 +154,33 @@ for tgz in TGZ:
     print('  %s 随包通用要点版在场：%s' % ('✔' if _top else '🔴', _top or '（缺）'))
     if not _top:
         ok = False
+    # 随包清单 ↔ 包内成员 **双向**（A-137 根治）：清单是安装侧"缺件＋陈旧件"比对的前提，
+    #   所以构建侧必须断言"清单 ≡ 包内成员（清单自身除外）"——否则安装侧会拿一份错的尺子去比对。
+    _relm = lambda n: n.split('/', 1)[1] if n.startswith('package/') else n
+    _mn = [m for m in members if m.endswith('_pack-manifest.txt')]
+    if not _mn:
+        print('  🔴 包内缺随包清单 `scripts/gates/_pack-manifest.txt`（缺它 ⇒ 安装侧无法双向比对）')
+        ok = False
+    else:
+        # ⚠ 自伤（首跑实测抓到）：此处原用外层 `with tarfile.open(tgz) as tf` 的句柄，
+        #   而该 `with` 块已结束 ⇒ `OSError: TarFile is closed`。**重新开一次**（只读、代价可忽略）。
+        import tarfile as _tarfile
+        with _tarfile.open(tgz) as _tf2:
+            _raw = _tf2.extractfile(_mn[0]).read().decode('utf-8', 'replace')
+        _man = {l.split('\t')[0].strip().replace('\\', '/')
+                for l in _raw.splitlines() if l.strip() and not l.lstrip().startswith('#')}
+        _pkgfiles = {_relm(m) for m in members if is_file.get(m, False)}
+        _expect = _man | {_relm(_mn[0])}          # 清单不含自己
+        _missing = sorted(_expect - _pkgfiles)
+        _extra = sorted(_pkgfiles - _expect)
+        print('  %s 随包清单 ≡ 包内成员（%d 项）：缺 %d ／ 多 %d'
+              % ('✔' if not (_missing or _extra) else '🔴', len(_man), len(_missing), len(_extra)))
+        if _missing:
+            print('       清单有、包内无：%s' % '、'.join(_missing[:8]))
+        if _extra:
+            print('       包内有、清单无：%s' % '、'.join(_extra[:8]))
+        if _missing or _extra:
+            ok = False
     # --- ④ 包内"多余产物"双向判据（2026-09-15 新增 · 修判据盲区） ---
     # 事故：4.6.4 两个 tgz 内混入 scripts/__pycache__/*.pyc（76,966 B），而本脚本与前序所有门禁
     #      都**只查"该有的在不在、内容对不对"，无人查"有没有多余东西"** ⇒ 脏包一路绿灯发到发行口。
