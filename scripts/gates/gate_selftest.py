@@ -41,7 +41,7 @@ ROOT = _cfg.root
 TOOLS = _cfg.tools
 # ⚠ 三个"工作目录"必须分开（本节自伤登记 · 实测抓出）：
 #   `WORK`      = **配套脚本目录**（`yaml_check_generic.cjs`／`check_md_tables.py`／`machine_scan_*.py` 等所在）
-#                 ——旧常量 `WORK = <root>\.work\fei-lixing-fanrong` 指的就是它；首版被我换成 cfg.work ⇒
+#                 ——旧常量 `WORK = <root>\.work\<配套脚本目录>` 指的就是它；首版被我换成 cfg.work ⇒
 #                 `subprocess ... cwd=WORK` 指向新目录 ⇒ `NotADirectoryError`（该目录下没有那些 .cjs）。
 #   `GATE_WORK` = **门禁自己的产物目录**（基线／沙箱／临时 json）——来自 `cfg.work`
 #   `MACH`      = **机器层权威脚本目录**——来自 `cfg.mach`
@@ -301,7 +301,7 @@ def main():
     ok &= all(s6)
 
     # ── 样本 7（A-132 自证 · 2026-09-19）：**波段 id 形态**的成对差分 ─────────────────
-    #    背景（NAS 异机实测）：册 `cn-pop-2100` 的波段名是 `E1..E6`，产出**完全合规**，
+    #    背景（NAS 异机实测）：册 `<task>` 的波段名是 `E1..E6`，产出**完全合规**，
     #    却被 `verify_candidates` 判「切块为空 ⇒ 条目 0」（假红）；同册在 `gate_stage`
     #    的格式判据下却是绿的 ⇒ **一手绿一手红，判决取决于用哪把尺子**。
     #    本样本要吃住这件事，必须**成对**：

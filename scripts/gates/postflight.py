@@ -53,7 +53,7 @@ ROOT = _cfg.root
 TOOLS = _cfg.tools
 # ⚠ 三个"工作目录"必须分开（本节自伤登记 · 实测抓出）：
 #   `WORK`      = **配套脚本目录**（`yaml_check_generic.cjs`／`check_md_tables.py`／`machine_scan_*.py` 等所在）
-#                 ——旧常量 `WORK = <root>\.work\fei-lixing-fanrong` 指的就是它；首版被我换成 cfg.work ⇒
+#                 ——旧常量 `WORK = <root>\.work\<配套脚本目录>` 指的就是它；首版被我换成 cfg.work ⇒
 #                 `subprocess ... cwd=WORK` 指向新目录 ⇒ `NotADirectoryError`（该目录下没有那些 .cjs）。
 #   `GATE_WORK` = **门禁自己的产物目录**（基线／沙箱／临时 json）——来自 `cfg.work`
 #   `MACH`      = **机器层权威脚本目录**——来自 `cfg.mach`
@@ -341,8 +341,18 @@ def main():
         '防"规则清单落后于源根"漂移（批15 实证）')
 
     # ⑧-b 引文型附属文件零问题闸（§22 · ADHD 线收口批挂入；先平账后拧闸：建闸时已 8/8 过）
-    _task = 'adhd-pro'
-    _glq = os.path.join(ROOT, '.work', _task, 'skills', 'adhd-parenting-guide', 'references')
+    # 通用化（A-74 · 2026-09-19 脱敏批）：不再写死被检任务名 —— 改为**自动发现**
+    #   「声明了 incumbent gate 的任务」（其配置在**任务自己的目录**里，数据不出册）。
+    _task = ''
+    for _lp in sorted(glob.glob(os.path.join(ROOT, '.work', '*', 'layer-quotes-*.json'))):
+        try:
+            _lj = json.load(io.open(_lp, encoding='utf-8'))
+        except Exception:
+            continue
+        if _lj.get('incumbent_gate') or _lj.get('gate_ready') is False:
+            _task = _lj.get('task') or os.path.basename(os.path.dirname(_lp))
+            break
+    _glq = os.path.join(ROOT, '.work', _task, 'skills') if _task else ''
     if os.path.isdir(_glq):
         rc, so, se = run([sys.executable, os.path.join(TOOLS, 'gate_layer_quotes.py'),
                           '--task', _task])
@@ -558,7 +568,7 @@ def main():
         not _verhits, 'A-53：写死"最新版号" ⇒ 发新版时给最新版自己盖反向标注（注释内引用不算）')
 
     # ⑬ 波段 id 语法单一来源（A-132 · 2026-09-19 挂入 · 只读）
-    #   依据（NAS 异机实测 · 活体标本）：册 `cn-pop-2100` 的波段名是 `E1..E6`，产出**完全合规**，
+    #   依据（NAS 异机实测 · 活体标本）：册 `<task>` 的波段名是 `E1..E6`，产出**完全合规**，
     #   却被 `verify_candidates` 判「切块为空 ⇒ 条目 0」（假红），而**同一册**在 `gate_stage`
     #   的格式判据下是绿的 ⇒ **一手绿一手红，判决取决于用哪把尺子**。
     #   根因：这套语法在工作台里**被内联写了 17 处、共 4 种残缺写法**，而每次"修"都在另一形态上修坏

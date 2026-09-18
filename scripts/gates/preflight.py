@@ -46,7 +46,7 @@ ROOT = _cfg.root
 TOOLS = _cfg.tools
 # ⚠ 三个"工作目录"必须分开（本节自伤登记 · 实测抓出）：
 #   `WORK`      = **配套脚本目录**（`yaml_check_generic.cjs`／`check_md_tables.py`／`machine_scan_*.py` 等所在）
-#                 ——旧常量 `WORK = <root>\.work\fei-lixing-fanrong` 指的就是它；首版被我换成 cfg.work ⇒
+#                 ——旧常量 `WORK = <root>\.work\<配套脚本目录>` 指的就是它；首版被我换成 cfg.work ⇒
 #                 `subprocess ... cwd=WORK` 指向新目录 ⇒ `NotADirectoryError`（该目录下没有那些 .cjs）。
 #   `GATE_WORK` = **门禁自己的产物目录**（基线／沙箱／临时 json）——来自 `cfg.work`
 #   `MACH`      = **机器层权威脚本目录**——来自 `cfg.mach`
@@ -209,7 +209,7 @@ def main():
     # 此前全靠自觉；本闸把它们变成**开工即拦**：活跃任务未过闸 → preflight 直接非零退出。
     # 活跃判据＝该任务 PIPELINE_STATE.md 的 mtime 在 24h 内（自动、无需声明、无法手改规避）。
     #
-    # ⚠ 判据修正（2026-09-17 · manias-crashes 实测抓到「开工死锁」· 用户拍板甲案）：
+    # ⚠ 判据修正（2026-09-17 · <task> 实测抓到「开工死锁」· 用户拍板甲案）：
     #   旧实现把**三闸并成一个与**（gate_start ∧ gate_stage ∧ gate_checklist 全绿），
     #   而 gate_stage 要求**六阶段产物齐备**、gate_checklist 要求**执行单 36 项逐项完成**
     #   —— 那是"**干完活**"的条件，不是"开工前"的条件。

@@ -18,7 +18,7 @@
   R7 **空集拒跑**（A-37 同族）：解析 0 条引文或 0 个锚块 ⇒ 直接拒跑。
   R8 **产物自带 schema 版本与口径全字段**（A-46：计数不可跨版本比较）。
 
-用法：python tools\\gate_layer_quotes.py --task adhd-pro [--strict]
+用法：python tools\\gate_layer_quotes.py --task <task> [--strict]
       `--strict`：把"长引文待复核"也视为红（交付前可要求）
 """
 import io
@@ -45,20 +45,35 @@ SHORT_LEN = 20
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--task', default='adhd-pro')
+    ap.add_argument('--task', required=True, help='任务 slug（**必填**，无册别默认值）')
     ap.add_argument('--strict', action='store_true')
-    # ⚠ 通用化（2026-09-17 manias-crashes 实测抓到 · A-01 同族）：原实现把被检目录与文件名
+    # ⚠ 通用化（2026-09-17 <task> 实测抓到 · A-01 同族）：原实现把被检目录与文件名
     #   写死为 `skills\adhd-parenting-guide\references\专业层-*.md` ⇒ **换书即 0 命中**，
     #   而 0 命中会触发"空集拒跑"⇒ 该闸对新任务**永远无法通过**（不是漏检，是没生效）。
     #   新增两个开关（默认值＝原行为，向后兼容）：
-    #     --ref-dir   被检目录（相对任务目录；默认 adhd-pro 的 references）
+    #     --ref-dir   被检目录（相对任务目录；默认 <task> 的 references）
     #     --glob      文件名 glob（默认 `专业层-*.md`）
-    ap.add_argument('--ref-dir', default=os.path.join('skills', 'adhd-parenting-guide', 'references'))
-    ap.add_argument('--glob', default='专业层-*.md')
+    # ⚠ 通用化（A-74 · 2026-09-19 脱敏批）：默认值改为**从当册配置读**
+    #   （`layer-quotes-<task>.json` 的 `layer`／`pattern`），**不再留任何册别的技能 slug／文件名**。
+    ap.add_argument('--ref-dir', default=None, help='被检目录（相对任务目录；默认取当册配置的 layer）')
+    ap.add_argument('--glob', default=None, help='文件名 glob（默认取当册配置的 pattern）')
     a = ap.parse_args()
     task = a.task.replace('.work/', '').replace('.work\\', '')
     TASK = os.path.join(ROOT, '.work', task)
-    REF = os.path.join(TASK, a.ref_dir)
+    _cfgp = os.path.join(TASK, 'layer-quotes-%s.json' % task)
+    _cfg = {}
+    if os.path.isfile(_cfgp):
+        try:
+            _cfg = json.loads(io.open(_cfgp, encoding='utf-8').read())
+        except Exception as _e:
+            print('🔴 当册配置解析失败：%s: %s' % (type(_e).__name__, _e))
+            return 2
+    _ref = a.ref_dir or _cfg.get('layer') or ''
+    _glb = a.glob or _cfg.get('pattern') or ''
+    if not (_ref and _glb):
+        print('🔴 缺被检目录/文件名 glob：给 --ref-dir/--glob，或在 %s 写 layer/pattern' % _cfgp)
+        return 2
+    REF = _ref if os.path.isabs(_ref) else os.path.join(TASK, _ref)
     CLI = os.path.join(ROOT, 'tools', 'verify_layer_quotes.py')
 
     print('=== 引文型附属文件 · 零问题机检闸 ===')
@@ -74,7 +89,7 @@ def main():
     import verify_layer_quotes as V
     total = pagespec = unparsable = nobook = 0
     bad_samples, nobook_samples = [], []
-    for p in sorted(glob.glob(os.path.join(REF, a.glob))):
+    for p in sorted(glob.glob(os.path.join(REF, _glb))):
         for i, ln in enumerate(io.open(p, encoding='utf-8', errors='replace').read().splitlines(), 1):
             for m in ANCHOR_BLOCK.finditer(ln):
                 total += 1

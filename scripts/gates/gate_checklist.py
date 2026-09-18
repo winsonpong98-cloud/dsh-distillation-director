@@ -2,7 +2,7 @@
 """gate_checklist.py —— 执行单产物存在性闸（§21.3 候选工装 → 已建成 · 2026-09-13 晚 · 包 4.6.2）
 
 背景：§21.6 第 2 条（执行单制）此前只有两道半闸——gate_start 闸③查"执行单文件存在＋形态"、
-gate_stage 查"六阶段产物"；**执行单 36 项逐项的"证据登记＋产物存在"无人机查**，而《最优解人生》# generic-ok: PROVENANCE
+gate_stage 查"六阶段产物"；**执行单 36 项逐项的"证据登记＋产物存在"无人机查**，而「某书」# generic-ok: PROVENANCE
 事故跳过的五项（自查表／独立 I/O／防线4／d8／账本）恰全在这个盲区。本闸把 V3.1 纪律 1 的
 "每完成一项记证据与日期"变成 rc 检查；用户指令（2026-09-13 晚）：「现在做，我有时候不值守」。
 
@@ -47,7 +47,7 @@ ROOT = _cfg.root
 TOOLS = _cfg.tools
 # ⚠ 三个"工作目录"必须分开（本节自伤登记 · 实测抓出）：
 #   `WORK`      = **配套脚本目录**（`yaml_check_generic.cjs`／`check_md_tables.py`／`machine_scan_*.py` 等所在）
-#                 ——旧常量 `WORK = <root>\.work\fei-lixing-fanrong` 指的就是它；首版被我换成 cfg.work ⇒
+#                 ——旧常量 `WORK = <root>\.work\<配套脚本目录>` 指的就是它；首版被我换成 cfg.work ⇒
 #                 `subprocess ... cwd=WORK` 指向新目录 ⇒ `NotADirectoryError`（该目录下没有那些 .cjs）。
 #   `GATE_WORK` = **门禁自己的产物目录**（基线／沙箱／临时 json）——来自 `cfg.work`
 #   `MACH`      = **机器层权威脚本目录**——来自 `cfg.mach`

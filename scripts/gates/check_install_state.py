@@ -38,7 +38,7 @@ python scripts\gates\check_install_state.py
 
 # 指定（容器/异机/多 profile 时）
 python scripts\gates\check_install_state.py --home /data --profile web `
-       --plugin-dir /workspace/distillation-director-plugin --skills-root /workspace
+       --plugin-dir <容器根>/distillation-director-plugin --skills-root /workspace
 
 # 机器可读
 python scripts\gates\check_install_state.py --json out.json
@@ -154,13 +154,13 @@ def detect_workspace_root(explicit):
 
 
 def detect_skills_roots(explicit):
-    """技能根候选：本地工作区（<工作区>/.dsh/skills）＋容器工作区（/workspace/.dsh/skills）。"""
+    """技能根候选：本地工作区（<工作区>/.dsh/skills）＋容器工作区（<容器根>/.dsh/skills）。"""
     cands = []
     if explicit:
         cands.append(os.path.join(explicit, '.dsh', 'skills') if not explicit.rstrip('/\\').endswith('skills')
                      else explicit)
     if os.path.isdir('/workspace'):
-        cands.append('/workspace/.dsh/skills')
+        cands.append('<容器根>/.dsh/skills')
         cands.append('/workspace')
     ws = detect_workspace_root(None)
     if ws:
@@ -356,7 +356,7 @@ def layer3_runtime(profile_dir, pkg_name, skills_roots, plugin_dir, url):
     pkg_skill = os.path.join(plugin_dir, 'SKILL.md') if plugin_dir else None
     pkg_sha = sha256(pkg_skill) if (pkg_skill and os.path.isfile(pkg_skill)) else None
     if not skills_roots:
-        notes.append('未找到任何技能根候选（<工作区>/.dsh/skills、/workspace/.dsh/skills）⇒ 在役层第 c 项判**不适用**')
+        notes.append('未找到任何技能根候选（<工作区>/.dsh/skills、<容器根>/.dsh/skills）⇒ 在役层第 c 项判**不适用**')
     else:
         found = False
         for sr in skills_roots:
@@ -464,7 +464,7 @@ def main():
     ap.add_argument('--plugin', default=DEFAULT_PLUGIN, help='插件包名（默认 %s）' % DEFAULT_PLUGIN)
     ap.add_argument('--plugin-dir', help='插件目录（默认按 profile node_modules／工作区自动探测）')
     ap.add_argument('--workspace', help='蒸馏工作区根（默认自动上溯找 .dsh）')
-    ap.add_argument('--skills-root', help='技能根（默认探测 <工作区>/.dsh/skills 与 /workspace/.dsh/skills）')
+    ap.add_argument('--skills-root', help='技能根（默认探测 <工作区>/.dsh/skills 与 <容器根>/.dsh/skills）')
     ap.add_argument('--url', default='http://127.0.0.1:3080/',
                     help='服务地址用于可达性检查（默认本机 web；容器里给 http://127.0.0.1:4080/）')
     ap.add_argument('--json', help='把结果写成 JSON')

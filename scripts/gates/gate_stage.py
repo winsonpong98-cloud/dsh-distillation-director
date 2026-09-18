@@ -9,8 +9,8 @@ r"""gate_stage.py —— 蒸馏"阶段门禁状态机"（让跳过阶段＝命�
   ⑤ 任何"人工确认"类门禁（阶段0 骨架）必须有用户确认标记，无标记＝红。
 
 用法：
-    python tools\gate_stage.py --task adhd-pro              # 列出全部阶段状态
-    python tools\gate_stage.py --task adhd-pro --stage 2    # 只判"能否进入阶段2"
+    python tools\gate_stage.py --task <task>              # 列出全部阶段状态
+    python tools\gate_stage.py --task <task> --stage 2    # 只判"能否进入阶段2"
 退出码：0 = 该阶段可进入；1 = 不可进入（附缺失项）
 """
 import argparse, glob, json, os, re, sys, time
@@ -35,7 +35,7 @@ ROOT = _cfg.root
 TOOLS = _cfg.tools
 # ⚠ 三个"工作目录"必须分开（本节自伤登记 · 实测抓出）：
 #   `WORK`      = **配套脚本目录**（`yaml_check_generic.cjs`／`check_md_tables.py`／`machine_scan_*.py` 等所在）
-#                 ——旧常量 `WORK = <root>\.work\fei-lixing-fanrong` 指的就是它；首版被我换成 cfg.work ⇒
+#                 ——旧常量 `WORK = <root>\.work\<配套脚本目录>` 指的就是它；首版被我换成 cfg.work ⇒
 #                 `subprocess ... cwd=WORK` 指向新目录 ⇒ `NotADirectoryError`（该目录下没有那些 .cjs）。
 #   `GATE_WORK` = **门禁自己的产物目录**（基线／沙箱／临时 json）——来自 `cfg.work`
 #   `MACH`      = **机器层权威脚本目录**——来自 `cfg.mach`
@@ -116,7 +116,7 @@ def check_stage1(work):
     else:
         # 判据加强（P-23）：首版只数任意 `### ` 行，被**旧的自造格式笔记**骗过（实测假通过）。
         # 改为：必须是**官方模板条目格式** —— `### {band}-NNN  [类型] [技能=…]`
-        # 形态容错修复（2026-09-17 · manias-crashes 实测自伤）：原式 `[A-Za-z]\d+-\d{3}` 实际要求
+        # 形态容错修复（2026-09-17 · <task> 实测自伤）：原式 `[A-Za-z]\d+-\d{3}` 实际要求
         # **波段号前无连字符**（如 `B12-005`），而官方模板/本册产出写的是 `D-001`、`A-001`
         # （连字符在波段号之后）⇒ 该式恒不命中，**阶段1 闸对任何字母波段名书册恒红**（假红）。
         # ⚠ 2026-09-19 二次定案（A-132）：当时的"改法"`[A-Za-z][0-9]*-[0-9]{3}` 仍然只吃

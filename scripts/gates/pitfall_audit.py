@@ -46,7 +46,7 @@ ROOT = _cfg.root
 TOOLS = _cfg.tools
 # ⚠ 三个"工作目录"必须分开（本节自伤登记 · 实测抓出）：
 #   `WORK`      = **配套脚本目录**（`yaml_check_generic.cjs`／`check_md_tables.py`／`machine_scan_*.py` 等所在）
-#                 ——旧常量 `WORK = <root>\.work\fei-lixing-fanrong` 指的就是它；首版被我换成 cfg.work ⇒
+#                 ——旧常量 `WORK = <root>\.work\<配套脚本目录>` 指的就是它；首版被我换成 cfg.work ⇒
 #                 `subprocess ... cwd=WORK` 指向新目录 ⇒ `NotADirectoryError`（该目录下没有那些 .cjs）。
 #   `GATE_WORK` = **门禁自己的产物目录**（基线／沙箱／临时 json）——来自 `cfg.work`
 #   `MACH`      = **机器层权威脚本目录**——来自 `cfg.mach`
@@ -184,8 +184,11 @@ def main():
             if f.startswith('_'):          # `_t.py` / `_dsh_probe.py` 等＝**演示用示例文件名**，非真实工具
                 demo_names.setdefault(f, []).append(cid)
                 continue
-            cands = [os.path.join(TOOLS, f), os.path.join(ROOT, '.work', 'fei-lixing-fanrong', f),
-                     os.path.join(ROOT, '投资蒸馏', '三闸机器化', f)]
+            # 通用化（A-74）：不再写死某个 `.work\<配套脚本目录>` 与某个书树名 ——
+            #  配套脚本目录来自 cfg.scripts_dir（可 env 覆盖），书树来自 cfg.book_trees。
+            cands = [os.path.join(TOOLS, f), os.path.join(WORK, f)]
+            cands += [os.path.join(ROOT, _bt, '三闸机器化', f)
+                      for _bt in (_cfg.book_trees or [])]
             if not any(os.path.exists(c) for c in cands):
                 missing_scripts.setdefault(f, []).append(cid)
 
@@ -222,7 +225,7 @@ def main():
 # （已移除写死定义：改由上文 _pick/env 解析 —— 2026-09-17 可移植化）
         JSDIR = '' or (_JSC[-1] if _JSC else os.environ.get("DSH_JS_YAML_DIR", ""))
         TMP = os.environ.get('TEMP') or r'C:\Windows\Temp'
-        W = os.path.join(ROOT, '.work', 'fei-lixing-fanrong')
+        W = WORK          # 通用化（A-74）：配套脚本目录来自 cfg.scripts_dir
         M = os.path.join(ROOT, '投资蒸馏', '三闸机器化')
         CAT_MD = os.path.join(ROOT, '输出', '口径登记单-2026-09-12.md')
         # 端到端校验要一个具体 tgz：**自动取版本号最大的扁平版**（不写死版本，见 C-9 写死路径巡检）

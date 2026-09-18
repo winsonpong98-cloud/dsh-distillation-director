@@ -12,7 +12,7 @@ r"""gate_start.py —— 开工强制自检闸（针对"用摘要代替手册 / 
   闸5 模板闸（条件触发）：若存在 extractor-prompts/，每个 prompt 必须含官方模板的格式行
         ⇒ 自造提取器格式会被当场拦下
 
-用法: python tools\gate_start.py --task adhd-pro [--quiet]
+用法: python tools\gate_start.py --task <task> [--quiet]
 退出码: 0 = 可开工；1 = 有闸未过（不得开工）
 """
 import argparse, hashlib, json, os, re, sys
@@ -36,7 +36,7 @@ ROOT = _cfg.root
 TOOLS = _cfg.tools
 # ⚠ 三个"工作目录"必须分开（本节自伤登记 · 实测抓出）：
 #   `WORK`      = **配套脚本目录**（`yaml_check_generic.cjs`／`check_md_tables.py`／`machine_scan_*.py` 等所在）
-#                 ——旧常量 `WORK = <root>\.work\fei-lixing-fanrong` 指的就是它；首版被我换成 cfg.work ⇒
+#                 ——旧常量 `WORK = <root>\.work\<配套脚本目录>` 指的就是它；首版被我换成 cfg.work ⇒
 #                 `subprocess ... cwd=WORK` 指向新目录 ⇒ `NotADirectoryError`（该目录下没有那些 .cjs）。
 #   `GATE_WORK` = **门禁自己的产物目录**（基线／沙箱／临时 json）——来自 `cfg.work`
 #   `MACH`      = **机器层权威脚本目录**——来自 `cfg.mach`
@@ -85,7 +85,7 @@ def norm(s):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--task", required=True, help="任务 slug，如 adhd-pro")
+    ap.add_argument("--task", required=True, help="任务 slug，如 <task>")
     ap.add_argument("--quiet", action="store_true")
     a = ap.parse_args()
 

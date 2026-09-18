@@ -25,9 +25,14 @@ import os as _dsp_os, sys as _dsp_sys          # 可移植根目录：单一来�
 _dsp_sys.path.insert(0, _dsp_os.path.dirname(_dsp_os.path.abspath(__file__)))
 from _paths import ROOT  # noqa: E402
 import _bandid as BID  # noqa: E402  ← 波段 id 语法的**唯一来源**（A-132）
-WORK = os.path.join(ROOT, ".work", "adhd-pro")
-CAND = os.path.join(WORK, "candidates")
-SRCD = os.path.join(WORK, "notes", "source")
+WORK = None                    # 由 main() 依 --task 设定 —— **不留任何册别兜底值**（A-74）
+# ⚠ 自伤登记（2026-09-19 脱敏批 · 当场被门禁抓到）：下面两行原为 `os.path.join(WORK, …)`，
+#   把 WORK 改成 None 后 ⇒ **模块级 `join(None, …)` 在 import 时就抛 TypeError**
+#   ⇒ 任何 `import verify_candidates` 的工具（通用引文闸等）**统统崩**（表现为 rc=2 ＋ 裸栈）。
+#   **教训：拿掉"兜底值"时要连同"由它派生的模块级常量"一起处理** ——
+#   改一个常量不是改一个字符串，是改它的**依赖闭包**（同 A-132：只改一处＝没改）。
+CAND = None                    # 同上（main() 里按 --task 重算）
+SRCD = None                    # 同上（main() 里按 --task 重算）
 
 # 格式行：模板规定为 `### {band}-NNN  [类型] [技能=建议]`。
 # 放宽（2026-09-13 实测登记）：允许 `[技能=…]` 后再跟说明文字——T5 有 21 条 CAM 条目写作
@@ -37,7 +42,7 @@ SRCD = os.path.join(WORK, "notes", "source")
 # ⚠⚠ 本判据的历史＝**同一处被"修"四次、每次都修坏另一种形态**（A-132，2026-09-19 定案）：
 #   ① 原写 `[A-Za-z]\d+`（字母后必须跟数字）→ 只吃旧册 `T1-001`，**纯字母波段 `A-001` 恒不命中**；
 #   ② 改成 `[A-Za-z]\d*` → 仍吃不到双字母前缀 `ST-001`；
-#   ③ 再改成 `[A-Za-z]+` → **吃不到「字母＋数字」波段 `E1-001`/`T1-001`**（NAS 册 `cn-pop-2100`
+#   ③ 再改成 `[A-Za-z]+` → **吃不到「字母＋数字」波段 `E1-001`/`T1-001`**（NAS 册 `<task>`
 #      波段名恰是 `E1..E6` ⇒ 本脚本对**完全合规**的 `notes_E1..E6.md` 报
 #      🔴「切块为空：条目正则未命中任何块（工装缺陷，不得视为通过）」——**假红**，
 #      而同一册在 `gate_stage` 的格式判据（当时已是 `[A-Za-z][0-9]*`）下却是绿的 ⇒
@@ -62,10 +67,10 @@ ANCHOR = re.compile(r"^-\s*(?:页锚|锚|出处)\s*[：:]\s*(.+)$", re.M)
 # 修法：不猜书代号格式，按结构匹配 `[...]`。
 PAGEMARK = re.compile(r"---\s*\[[^\]]*\]\s*---")
 
-# ── 通用化（2026-09-17 · manias-crashes 实测）──────────────────────────────────
-# 原实现把 WORK 写死为 adhd-pro、页标记写死为 `--- [bark PDF p84] ---` 形态 ⇒ **换书即报废**（A-01 同族）。
+# ── 通用化（2026-09-17 · <task> 实测）──────────────────────────────────
+# 原实现把 WORK 写死为 <task>、页标记写死为 `--- [bark PDF p84] ---` 形态 ⇒ **换书即报废**（A-01 同族）。
 # 现支持三种页标记形态（`--pagemark` 选择，默认 auto）：
-#   dash   : `--- [bark PDF p84] ---`          （adhd-pro／投资线旧册）
+#   dash   : `--- [bark PDF p84] ---`          （<task>／投资线旧册）
 #   equals : `===== [PAGE 84] =====`           （`ocr_pages.py` / `build_ocr_text.py` 产物）
 #   hline  : `[p84]` **独占一行**                （`pdf_to_text.py` 产物 ⇒ 文字版 PDF 免 OCR 册，2026-09-17 新增）
 #   ⚠ hline 必须锚定"整行"（行首行尾），否则正文里的 `[p84]` 字样会被误当页标记（A-57 同族：形态必须写准）。
@@ -197,7 +202,7 @@ def _fallback_src(exclude_basename, task):
     return None
 
 
-# ── 标点族归一（2026-09-17 manias-crashes 实测必需）─────────────────────────────
+# ── 标点族归一（2026-09-17 <task> 实测必需）─────────────────────────────
 # 为什么必须做：提取器把源文的**中文弯引号**「“审判日”」转写成了**直引号**「"审判日"」，
 #   而两串除引号字形外**逐字相同** ⇒ 旧口径判"回源未命中"。实测：波段 A 41 条、F 7 条、
 #   B 1 条全属此类（**假红**：引文本身是对的，是尺子把字形当内容）。
@@ -311,7 +316,7 @@ def check_one(notes_path, src_path):
         if m.group(5):
             n_tail += 1
         eid = "%s-%s" % (m.group(1), m.group(2))
-        # 一个条目就该有**一行**引文（模板硬纪律：引文 ≤160 字）。实测抓到（NAS 册 `cn-pop-2100`
+        # 一个条目就该有**一行**引文（模板硬纪律：引文 ≤160 字）。实测抓到（NAS 册 `<task>`
         # 的 `E6-019`）：长引文被拆成 **3 行**，于是"33 条目 / 35 引文行"——数量不符却**静默通过**
         # （`A-28` 家族：判据只看"有没有"，不看"几条"）。**不阻断**（拆行是压 160 字的正当手法），
         # 但**必须显式列出来**，否则格式漂移无人可见。
@@ -347,8 +352,8 @@ def main():
     ap.add_argument("--notes")
     ap.add_argument("--src")
     ap.add_argument("--all", action="store_true")
-    ap.add_argument("--task", default="adhd-pro",
-                    help="任务 slug（决定 candidates/ 与默认源文件；默认 adhd-pro 保持向后兼容）")
+    ap.add_argument("--task", required=True,
+                    help="任务 slug（决定 candidates/ 与默认源文件；**必填**，无册别默认值）")
     ap.add_argument("--src-dir", default=None, help="--all 模式下按 <band>-*.txt 找源的目录（默认 <work>/notes/source）")
     ap.add_argument("--pagemark", choices=['auto', 'dash', 'equals', 'hline'], default='auto',
                     help="页标记形态；auto＝探测源文件（`===== [PAGE n] =====`→equals；行首 `[pn]`→hline；否则 dash）")

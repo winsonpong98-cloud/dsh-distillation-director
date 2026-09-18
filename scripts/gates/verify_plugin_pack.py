@@ -143,9 +143,17 @@ for tgz in TGZ:
               % ('✔' if (not miss and vok) else '🔴', j.get('version'), VER, miss if miss else '无'))
     else:
         print('  ✗ 包内无 package.json'); ok = False
-    # 附加：确认 manual-history 里有 V4.1
-    mh = [m for m in members if 'manual-V4.1' in m]
-    print('  %s manual-history 含 V4.1：%s' % ('✔' if mh else '⚠', mh if mh else '无'))
+    # 附加（2026-09-19 脱敏批 · 用户拍板方案乙）：**不再随包 manual-history 与完整内部手册**。
+    #   判据改为**反向**——包内**不得**出现它们（防"哪天又悄悄带回去"），并确认通用要点版在场。
+    _leak = sorted({m.split('/')[1] if m.count('/') > 1 else m for m in members
+                    if 'manual-history' in m or '蒸馏工程避坑手册' in m})
+    print('  %s 包内不含内部手册/历史手册：%s' % ('✔' if not _leak else '🔴', _leak or '干净'))
+    if _leak:
+        ok = False
+    _top = [m for m in members if '防坑要点-TOP20' in m]
+    print('  %s 随包通用要点版在场：%s' % ('✔' if _top else '🔴', _top or '（缺）'))
+    if not _top:
+        ok = False
     # --- ④ 包内"多余产物"双向判据（2026-09-15 新增 · 修判据盲区） ---
     # 事故：4.6.4 两个 tgz 内混入 scripts/__pycache__/*.pyc（76,966 B），而本脚本与前序所有门禁
     #      都**只查"该有的在不在、内容对不对"，无人查"有没有多余东西"** ⇒ 脏包一路绿灯发到发行口。

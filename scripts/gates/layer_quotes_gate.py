@@ -6,9 +6,9 @@ r"""layer_quotes_gate.py —— **引文型附属文件零问题闸（通用版 
 
 | 册 | 用的闸 | 问题 |
 |---|---|---|
-| 教育线（`adhd-pro`） | `gate_layer_quotes.py`（R1–R8） | **锚形态/目录/文件名/页源全部写死教育线**；`ANCHOR`／`BOOKS`／`ocr\%s_p%04d.txt` ⇒ 换册**空集拒跑** |
-| `manias-crashes` | `gate_layer_quotes_manias.py`（R1–R5） | **为该册另写一座闸** |
-| `guozhai-qihuo` | 任务本地 `verify_s4_layer_quotes.py`（只覆盖 S4）＋ 事后 `rquote --include-aux` | **同样是手搓替身** |
+| 教育线（`<task>`） | `gate_layer_quotes.py`（R1–R8） | **锚形态/目录/文件名/页源全部写死教育线**；`ANCHOR`／`BOOKS`／`ocr\%s_p%04d.txt` ⇒ 换册**空集拒跑** |
+| `<task>` | `gate_layer_quotes_manias.py`（R1–R5） | **为该册另写一座闸** |
+| `<task>` | 任务本地 `verify_s4_layer_quotes.py`（只覆盖 S4）＋ 事后 `rquote --include-aux` | **同样是手搓替身** |
 
 ⇒ **"每本书各造一座闸"** = 仪器没参数化；且 `gate_checklist` 的官方项数常量落后（36 vs 模板 37），
 **第 37 项"信息性不拦"** ⇒ 缺口**没有任何闸看得见**。

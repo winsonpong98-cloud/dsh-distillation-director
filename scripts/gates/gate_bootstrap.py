@@ -42,7 +42,7 @@ def _detect_scripts_dir(root):
 
     必需脚本（配套闸真正会调的）：`yaml_check_generic.cjs`／`check_md_tables.py`／
     `final_acceptance.py`／`skill_probe_generic.mjs`／`machine_scan_edu.py`。
-    自伤登记：首版只判"目录里有没有任一 .cjs"，结果选中了 `.work/adhd-pro`
+    自伤登记：首版只判"目录里有没有任一 .cjs"，结果选中了 `.work/<task>`
     （那里恰好也放了 .cjs）⇒ 让全部门禁判"解析失败"。⇒ 改为**按必需文件打分**，
     得分 <2 视为"未探测到"（相关检查判"不适用"，**不假红**）。
     """

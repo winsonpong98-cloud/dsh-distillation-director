@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 r"""stage15_merge_task.py —— 阶段1.5「去重合并 + 页锚三态 + 归属裁断」（**任务通用版**）
 
-为什么另写一份（而不是改 `stage15_merge.py`）：后者对 adhd-pro **写死了三处**
+为什么另写一份（而不是改 `stage15_merge.py`）：后者对 <task> **写死了三处**
 （`notes_T*.md` 的波段名、`--- [bark PDF p84] ---` 的页标记、`bark p84` 形态的锚、
 `BAND_LAYER` 波段→专业层映射）——**换书即报废**（避坑手册 A-01 同族）。
 本脚本把这三处外置为**任务配置**：`.work/<task>/bookspec-<task>.json`。
@@ -16,8 +16,8 @@ r"""stage15_merge_task.py —— 阶段1.5「去重合并 + 页锚三态 + 归�
   · 避坑手册 A-35：重复页标记必须**合并而非覆盖**并登记
 
 用法（输出路径显式传参 —— 手册 §17 V-11 写盘禁令）：
-  python tools\stage15_merge_task.py --task manias-crashes
-  python tools\stage15_merge_task.py --task manias-crashes --out-dir <目录>
+  python tools\stage15_merge_task.py --task <task>
+  python tools\stage15_merge_task.py --task <task> --out-dir <目录>
 退出码：0 = verified.md 已生成且零🔴；1 = 有🔴（逐条列明）
 """
 import argparse

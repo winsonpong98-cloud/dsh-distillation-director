@@ -72,8 +72,10 @@ def main():
                         shutil.copy2(f, os.path.join(dest, os.path.basename(f)))
                     n += 1
     # ---- 数据文件与自动探测（本次修：**必须真拷**，否则工作区缺手册 ⇒ pitfall_audit 无处可读）
+    #   2026-09-19（脱敏批 · 方案乙）：随包的是**通用要点版**（《防坑要点-TOP20.md》），
+    #   完整内部手册**不随包**（用户拍板：内部手册只留作者本地）⇒ 这里只拷随包件。
     data = {}
-    for f in ('蒸馏工程避坑手册.md', 'V3.1全量执行单.md'):
+    for f in ('防坑要点-TOP20.md', 'V3.1全量执行单.md'):
         src = next((os.path.join(d, f) for d in (gates, scr)
                     if os.path.isfile(os.path.join(d, f))), None)
         if src:
@@ -120,7 +122,7 @@ def main():
     print('✔ 已初始化：%s' % ws)
     print('   配置：%s' % cfg)
     print('   装入 tools\\：%d 个文件' % n)
-    missing = [f for f in ('V3.1全量执行单.md', '蒸馏工程避坑手册.md')
+    missing = [f for f in ('V3.1全量执行单.md', '防坑要点-TOP20.md')
                if not os.path.isfile(os.path.join(ws, 'tools', f))
                and not os.path.isfile(os.path.join(ws, f))]
     if missing:
