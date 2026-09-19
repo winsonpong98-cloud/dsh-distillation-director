@@ -20,6 +20,7 @@ r"""check_public_numbers.py —— **对外数字/版本一致性闸**（`A-135`
 | ⑥ | README **一级标题**里的版本号 | `package.json` 的 `version` |
 | ⑦ | **SKILL.md**「门禁套件（N 件）」 | 同 ①（**同一事实的第二个声明位**） |
 | ⑧ | 内部手册的**声明位与路径位**是否都注明"不随包"，且包内**确实没有**该手册 | 反向判据（`A-137` 家族：移除类改动必须在声明侧同步） |
+| ⑨ | `package.json` 的 `description` 若内嵌 `V<数字>` | 必须等于 `version`（**同一文件里两个版本声明位**） |
 
 ### ⑦ 为什么必须查 SKILL.md（本项 2026-09-19 第二批加入）
 
@@ -60,7 +61,7 @@ DEFAULT_PLUG = None
 
 
 def _resolve_plug(explicit=None):
-    """插件目录解析 —— **改用唯一来源** `_plugdir.resolve_plugin_dir`（`A-133`）。
+    r"""插件目录解析 —— **改用唯一来源** `_plugdir.resolve_plugin_dir`（`A-133`）。
 
     旧版本这里自己写了一套（DSH_PLUGIN_DIR → `_paths.ROOT/distillation-director-plugin` → 逐级上溯），
     与 `verify_pack_manifest.py` 里的另一套**互不一致**（后者把 `tools\` 当成了包）。
@@ -218,6 +219,14 @@ def collect_claims(plug):
     # ⑧-4 反向判据：包内不得真的躺着手册
     if in_pack:
         probs.append('包内出现了内部手册：%s' % ', '.join(sorted(set(in_pack))[:3]))
+    # ⑨ description 内嵌的版本号必须与 version 同代（2026-09-19 发 npm 前的元数据自检抓到）
+    #   实测形态：version=4.9.14，而 desc 里写着「（V4.9.12：…）」——**同一份文件里两个声明位不同代**，
+    #   而且漂的位置是 **npm 页面最显眼的那一行**。同族 `A-139`。
+    _dv = re.findall(r'V(\d+\.\d+\.\d+)', pkg.get('description', ''))
+    rows.append(('desc 内嵌的版本号', '／'.join(_dv) if _dv else '(未内嵌)',
+                 ver + '（内嵌时必须同代）',
+                 (not _dv) or all(x == ver for x in _dv),
+                 'A-139：description 也是版本声明位；内嵌就必须同代（最好**不内嵌**）'))
     rows.append(('内部手册：不随包声明 ＋ 包内不存在',
                  '不随包（声明位＋路径位）' if not probs else '；'.join(probs[:2]),
                  '包内 %d 处' % len(in_pack), not probs,
@@ -271,6 +280,18 @@ def selftest():
         hit = any((not r[3]) and 'SKILL' in r[0] for r in rows)
         print('  %s 坏样本②版本声明不一致被检出' % ('✔' if hit else '🔴'))
         ok &= hit
+        # 坏样本（第 ⑥ 类）：desc 内嵌的版本号与 version 不同代
+        io.open(os.path.join(d, 'package.json'), 'w', encoding='utf-8').write(
+            json.dumps({'version': '9.9.9', 'description': 'x（V1.2.3：旧批次）'}, ensure_ascii=False))
+        io.open(os.path.join(d, 'README.md'), 'w', encoding='utf-8').write(
+            '# 某插件 V9.9.9\nSKILL.md 技能正文（**V9.9.9 权威**）\n门禁与工具 4 件\n| **v9.9.9** | x | **本版** |\n')
+        rows = collect_claims(d)
+        hit = any((not r[3]) and 'desc 内嵌' in r[0] for r in rows)
+        print('  %s 坏样本⑥ desc 内嵌版本不同代被检出' % ('✔' if hit else '🔴'))
+        ok &= hit
+        io.open(os.path.join(d, 'package.json'), 'w', encoding='utf-8').write(
+            json.dumps({'version': '9.9.9', 'description': 'x'}, ensure_ascii=False))
+
         # 坏样本：承诺随带的要点版缺失
         os.remove(os.path.join(gd, '防坑要点-TOP20.md'))
         io.open(os.path.join(d, 'README.md'), 'w', encoding='utf-8').write(
@@ -300,7 +321,7 @@ def selftest():
         ok &= hit
     finally:
         shutil.rmtree(d, ignore_errors=True)
-    print('  %s 自证%s' % ('✔' if ok else '🔴', '通过（5 类坏样本全拦 ＋ 好样本放行）' if ok else '失败'))
+    print('  %s 自证%s' % ('✔' if ok else '🔴', '通过（6 类坏样本全拦 ＋ 好样本放行）' if ok else '失败'))
     return ok
 
 
