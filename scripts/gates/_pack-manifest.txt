@@ -2,12 +2,12 @@
 # 格式：<包内相对路径>	<字节>	<md5>
 # 本文件自身不入清单（自指无意义）；.tgz/__pycache__ 等本就不随包。
 LICENSE	34523	eb1e647870add0502f8f010b19de32af
-README.md	41024	697a9d0aa8e28dbdc42497afa2720299
+README.md	41595	dc72b5984e2f6be5581b335493d2ca90
 SKILL.md	129386	cef62a9e7589fa9de1e1a430dbc47618
 cordis.patch.yml	80	3485275b749633dab03a1970c0d82e59
 extractors/extractor-template-v4.1.md	3189	b8e44e92c6387ce01fb823a4ad7d2910
 index.js	1851	e18468cacbe54afd9e425216f74baa1e
-package.json	1800	097d01effa8bdc46fa82444ef792aa57
+package.json	1800	6d6c70c33a4fb88cfc21e9b0d6c0b153
 scripts/blindtest_lexicon_mock_v1.py	16160	a2395459c2a2e2d9ac77bd8f6482b670
 scripts/defense3_impersonation_scan.py	9530	5cc44d7149581ec4e69aa27d58ca755c
 scripts/gates/V3.1全量执行单.md	7782	d3d708794a19c4f62da999364559c13b
