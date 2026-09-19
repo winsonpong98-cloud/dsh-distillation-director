@@ -1,6 +1,6 @@
 {
  "name": "dsh-distillation-director",
- "version": "4.9.13",
+ "version": "4.9.14",
  "license": "AGPL-3.0-or-later",
  "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.9.12：**对抗式体检批**——另写\"从未查过的 9 个面\"的检查器（npm 文件集／仓库 vs 包／清单 md5 逐项／两版 tgz 同内容／死引用／SKILL.md 声明数），抓到并修掉 3 处实质文档错误：SKILL.md 声明 34 件≠实物 37、§0.0 误称\"门禁脚本不在插件载荷内\"（4.9.3 起一直随包）、§18.3 把不随包内部手册当作读者文档；并把「SKILL.md 声明数」与「提及内部手册必须注明不随包」两条加进 check_public_numbers.py（7 → 9 项）",
  "keywords": [

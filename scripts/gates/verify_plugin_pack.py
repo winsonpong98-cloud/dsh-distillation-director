@@ -131,6 +131,21 @@ else:
     print('  %-34s %s  (%d 字节)' % ('SKILL.md（权威技能）', ref_skill, os.path.getsize(SKILL)))
 
 ok_all = True
+# ⚠ 2026-09-19 真机（NAS）实测：装机后本机**只有装机件与发行资产**，没有工作台里的扁平 tgz
+#   ⇒ 旧版逐条打印"=== 缺文件（本版本应有）==="并判 🔴"存在不一致"——**诚实但误导**：
+#   它让人以为"包坏了"，实际是"**这台机器没有工作台源码布局**"（同族 `A-144`：把"本机一定有 X"当前提）。
+#   正确语义：**一个都不在场 ⇒ 判"不适用" ＋ 说明 ＋ rc=2**；部分缺 ⇒ 仍判红（那确实是缺件）。
+_present = [t for t in TGZ if os.path.exists(t)]
+if not _present:
+    print('ℹ 解包级校验**不适用**：本机没有找到任何发行件（tgz）。')
+    for _t in TGZ:
+        print('   期望路径：%s%s' % (_t, '（在场）' if os.path.exists(_t) else '（不在场）'))
+    print('   原因：本闸比对"发行件 ↔ 工作台权威层"，需要在工作台里同时具备 tgz 与插件目录；')
+    print('         只装了发行包的用户机器上没有这个布局**属正常**。')
+    print('   处置：在工作台里跑（先用打包器生成 tgz），或用 `--all` 指定存在的包；')
+    print('         已装的包要验证完整性，请用 `verify_pack_manifest.py --pkg-dir <插件目录>`'
+          '（随包清单双向比对，装机侧同样适用）。')
+    sys.exit(2)
 for tgz in TGZ:
     if not os.path.exists(tgz):
         print('\n=== 缺文件（本版本应有）：%s ===' % tgz)

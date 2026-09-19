@@ -2,12 +2,12 @@
 # 格式：<包内相对路径>	<字节>	<md5>
 # 本文件自身不入清单（自指无意义）；.tgz/__pycache__ 等本就不随包。
 LICENSE	34523	eb1e647870add0502f8f010b19de32af
-README.md	38574	4ba2a6e765f6fa0501060a20adc14cf9
-SKILL.md	128374	4eee65d8260d61ad84bca28f89588caa
+README.md	39379	71ccec4ee6eb59ccda97d5016abd06c1
+SKILL.md	129386	cef62a9e7589fa9de1e1a430dbc47618
 cordis.patch.yml	80	3485275b749633dab03a1970c0d82e59
 extractors/extractor-template-v4.1.md	3189	b8e44e92c6387ce01fb823a4ad7d2910
 index.js	1851	e18468cacbe54afd9e425216f74baa1e
-package.json	1729	073229e6126cbfd47186a9e5446105b4
+package.json	1729	ea6c4801abb619042f9945467136038f
 scripts/blindtest_lexicon_mock_v1.py	16160	a2395459c2a2e2d9ac77bd8f6482b670
 scripts/defense3_impersonation_scan.py	9530	5cc44d7149581ec4e69aa27d58ca755c
 scripts/gates/V3.1全量执行单.md	7782	d3d708794a19c4f62da999364559c13b
@@ -45,7 +45,7 @@ scripts/gates/stage15_merge_task.py	20122	231841656ba12877f7386a9127b9db11
 scripts/gates/verify_candidates.py	31317	88c8e890052a0fb3f22829b480af5922
 scripts/gates/verify_layer_quotes.py	24466	d3e8501e9d23c1646cdc55a815171f51
 scripts/gates/verify_pack_manifest.py	12675	913cd85f2b12bbdf9e935e9dfa57ba6d
-scripts/gates/verify_plugin_pack.py	17782	5b026b3ae70e4b1738d758485d56d820
+scripts/gates/verify_plugin_pack.py	19132	111862b06b8b8cd07e9de675d79135b2
 scripts/gates/防坑要点-TOP20.md	6848	faa18a552a7ee745e157b9e5acd905eb
 scripts/machine_layer_readycheck.py	7727	f3ff0b2a68b99d3cef81cb97a6bf6cb1
 scripts/machine_precheck_v2.py	50185	69cca75a32a75338565d9225b039617e
