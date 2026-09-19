@@ -1,12 +1,10 @@
 import os as _p_os, sys as _p_sys
 _p_sys.path.insert(0, _p_os.path.dirname(_p_os.path.abspath(__file__)))
-try:
-    from _paths import ROOT as _P_ROOT, WS as _P_WS, HOME as _P_HOME, ENGINE as _P_ENG
-except Exception:
-    _P_ROOT = _p_os.environ.get('DSH_DISTILL_ROOT') or _p_os.getcwd()
-    _P_WS = _p_os.path.dirname(_P_ROOT)
-    _P_HOME = _p_os.environ.get('DSH_HOME') or ''
-    _P_ENG = _p_os.environ.get('DSH_ENGINE') or ''
+# ⚠ 清理（2026-09-19 第二批）：此处原有 `from _paths import ROOT as _P_ROOT, ...` —— 
+#   **本文件就是 `_paths.py`**，那是一次**自导入**：模块尚未执行完 ⇒ 必然 ImportError ⇒
+#   被 except 吞掉、改用 DSH_DISTILL_ROOT 或 cwd，**然后在第 50 行又被真值覆盖**。
+#   即：那 6 行**永远是死代码**，且它给出的 ROOT（cwd）曾与真 ROOT 并存 ⇒ 谁读到哪一份看时机。
+#   保留 `sys.path.insert`（下游有用），删掉自导入块（`A-138`：同一事实只能有一个来源）。
 # -*- coding: utf-8 -*-
 r"""_paths.py —— **工作台唯一路径来源**（工作区/宿主/引擎/DSH 家目录）
 
@@ -57,6 +55,25 @@ def HOST(name, default=None):
     """宿主技能根：<WS>\\<name>（不存在则返回 None，交给调用方判"不适用"）"""
     p = os.environ.get('DSH_HOST_%s' % name.upper()) or os.path.join(WS, name)
     return p if os.path.isdir(p) else (default if default is not None else None)
+
+
+PLUGIN_NAME = 'distillation-director-plugin'
+
+# 插件目录解析：**唯一来源在 `_plugdir.py`**（`A-133`）。
+# 为什么单独立一个模块而不住在本文件里：本文件的 `_resolve_root()` **找不到根就 `sys.exit`**，
+# 那是工作台内正确、**异机（随包运行）致命**的行为；而 `_plugdir.py` 只用标准库、永不退出、永不打印。
+# 这里只做**再导出**（工作台内的脚本照旧写 `from _paths import resolve_plugin_dir`）。
+try:
+    from _plugdir import PLUGIN_NAME as _PLUGIN_NAME, resolve_plugin_dir, resolve_plugin_dir_report
+    PLUGIN_NAME = _PLUGIN_NAME
+except ImportError:  # `_plugdir.py` 不在场时的最小兜底（只认工作台布局，不猜别的）
+    def resolve_plugin_dir(explicit=None, need_manifest=False, here=None):
+        p = os.path.join(ROOT, PLUGIN_NAME)
+        return p if os.path.isdir(p) else None
+
+    def resolve_plugin_dir_report(explicit=None, need_manifest=False, here=None):
+        p = os.path.join(ROOT, PLUGIN_NAME)
+        return resolve_plugin_dir(explicit, need_manifest, here), [('<工作区根>/%s' % PLUGIN_NAME, p)]
 
 
 if __name__ == '__main__':

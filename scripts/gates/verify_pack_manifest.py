@@ -189,15 +189,32 @@ def main():
         print('=' * 78)
         return 0 if selftest() else 1
     here = os.path.dirname(os.path.abspath(__file__))
-    pkg = a.pkg_dir or (os.path.dirname(os.path.dirname(here)) if os.path.basename(here) == 'gates' else here)
-    man = a.manifest or os.path.join(pkg, MAN_DEFAULT)
-    if not os.path.isdir(pkg):
-        print('🔴 插件目录不存在：%s' % pkg)
+    # 插件目录解析改用**唯一来源** `_plugdir.resolve_plugin_dir`（A-133）。
+    # ⚠ 旧写法 `pkg = a.pkg_dir or (上两级 if basename=='gates' else here)` 有个真实事故：
+    #   从 `tools\` 单独运行时它把 **`tools\` 自己**当插件目录 ⇒ 去 `tools\scripts\gates\` 找清单 ⇒
+    #   打印"找不到随包清单 ⇒ 重装 4.9.10+"——**把"我路径解析错了"说成"你的包太旧"**。
+    #   随包运行时（`_plugdir.py` 与本文件同目录）正常工作；异机/无上下文时返回 None 并**列出试过的位置**。
+    pkg, tried = None, []
+    try:
+        sys.path.insert(0, here)
+        from _plugdir import resolve_plugin_dir_report
+        pkg, tried = resolve_plugin_dir_report(a.pkg_dir, need_manifest=True, here=__file__)
+    except ImportError:
+        pkg = a.pkg_dir or (os.path.dirname(os.path.dirname(here))
+                            if os.path.basename(here) == 'gates' else None)
+        tried = [('（`_plugdir.py` 不在场，用本文件内联兜底）', here)]
+    man = a.manifest or os.path.join(pkg or '', MAN_DEFAULT)
+    if not pkg or not os.path.isdir(pkg):
+        print('🔴 找不到插件目录（试过以下位置，均无 `scripts/gates/%s`）：'
+              % os.path.basename(MAN_DEFAULT))
+        for k, v in tried:
+            print('     %-26s %s' % (k, v))
+        print('   处置：`--pkg-dir <插件目录>` 或设 `DSH_PLUGIN_DIR`。')
         return 2
     if not os.path.isfile(man):
-        print('🔴 找不到随包清单：%s' % man)
-        print('   说明：清单由打包器（repack_plugin.py）在 4.9.10 起生成；更早的包没有它。')
-        print('   处置：重装 4.9.10+ 版本，或手动指定 --manifest <路径>。')
+        print('🔴 在该插件目录里找不到随包清单：%s' % man)
+        print('   说明：清单由打包器（repack_plugin.py）在 4.9.10 起生成；该目录里的包可能更早。')
+        print('   处置：升级到 4.9.10+ 的包（含清单），或用 `--manifest <路径>` 显式指定。')
         return 2
     if a.list:
         for rel, (size, h) in sorted(read_manifest(man).items()):

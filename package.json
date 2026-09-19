@@ -1,8 +1,8 @@
 {
  "name": "dsh-distillation-director",
- "version": "4.9.11",
+ "version": "4.9.12",
  "license": "AGPL-3.0-or-later",
- "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.9.11：**对外数字与实物同代＋全面体检批**——新增闸 check_public_numbers.py：README 的「门禁与工具 N 件」/SKILL 权威版本/版本表本版行/承诺随带件，逐项与**发行件实物**比对，含 3 类坏样本自证，挂 postflight ⑮；并修掉体检抓到的三处不同代（件数 34→36、目录结构版本号漏升、版本表两行都标\"本版\"）；同时修 check_script_sync 的权威路径（原指向已不存在的目录 ⇒ 恒报\"缺失 4 个\"假红）、把两个未发行的一次性件登记进 ONETIME 授权表、去掉 init_workspace 注释里的书名号）",
+ "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.9.12：**对抗式体检批**——另写\"从未查过的 9 个面\"的检查器（npm 文件集／仓库 vs 包／清单 md5 逐项／两版 tgz 同内容／死引用／SKILL.md 声明数），抓到并修掉 3 处实质文档错误：SKILL.md 声明 34 件≠实物 37、§0.0 误称\"门禁脚本不在插件载荷内\"（4.9.3 起一直随包）、§18.3 把不随包内部手册当作读者文档；并把「SKILL.md 声明数」与「提及内部手册必须注明不随包」两条加进 check_public_numbers.py（7 → 9 项）",
  "keywords": [
   "dsh-plugin",
   "deepseek-harness",

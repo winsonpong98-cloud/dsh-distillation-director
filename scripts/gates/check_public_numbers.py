@@ -17,6 +17,27 @@ r"""check_public_numbers.py —— **对外数字/版本一致性闸**（`A-135`
 | ③ | README 版本表**首行**版本 | `package.json` 的 `version` |
 | ④ | `package.json` 的 `description` 长度 | ≤ 1024（npm 上限） |
 | ⑤ | README 声明的"随包要点版"是否存在 | 包内 `防坑要点-TOP20.md` 在场 |
+| ⑥ | README **一级标题**里的版本号 | `package.json` 的 `version` |
+| ⑦ | **SKILL.md**「门禁套件（N 件）」 | 同 ①（**同一事实的第二个声明位**） |
+| ⑧ | 内部手册的**声明位与路径位**是否都注明"不随包"，且包内**确实没有**该手册 | 反向判据（`A-137` 家族：移除类改动必须在声明侧同步） |
+
+### ⑦ 为什么必须查 SKILL.md（本项 2026-09-19 第二批加入）
+
+上一批只查 README，**当批就漏了**：SKILL.md 第 36 行写着「门禁套件（**34 件**，随包发行）」，
+而实物已是 **37 件**——**同一事实有两个声明位，我只看住了一个**。
+（`A-138` 的同族现象：**同一事实的每个声明位都是独立失效点**。）
+
+### ⑧ 的射程：为什么**不**要求 30 处证据锚都加注
+
+SKILL.md/README 里有 30 余处 `《避坑手册》A-xx` 形式的**证据锚**。要求每处都加"不随包"
+既是噪音、又会把文档改烂。**该闸抓的是"读者会误以为它随包"的那几种写法**：
+
+1. **权威声明位**——§0.0 B 段（"哪些随包／哪些不随包"的清单）必须写明手册不随包；
+2. **§18.3 标题**——该节是手册的正文介绍位，标题必须标"不随包"；
+3. **给路径的位置**——凡写出 `` `蒸馏工作区\蒸馏工程避坑手册.md` `` 这类**可打开路径**的行，
+   其自身或上下 3 行内必须出现"不随包"（给了路径＝暗示读者手里有）；
+4. **反向判据**——包内**不得**存在该手册文件（4.9.9 起移出；`tar -xzf` 只增不删，
+   所以"移出"必须在**声明侧**也有闭环，`A-137`）。
 
 **不查**：册数／技能数／成本等**随使用者工作区变化**的数字（那些在本 README 里已写明口径与复算方式，
 不适合做阈值闸——写死就成了"作者数据进通用件"，`A-74`）。
@@ -39,11 +60,21 @@ DEFAULT_PLUG = None
 
 
 def _resolve_plug(explicit=None):
-    if explicit and os.path.isdir(explicit):
-        return os.path.abspath(explicit)
-    v = (os.environ.get('DSH_PLUGIN_DIR') or '').strip()
-    if v and os.path.isdir(v):
-        return os.path.abspath(v)
+    """插件目录解析 —— **改用唯一来源** `_plugdir.resolve_plugin_dir`（`A-133`）。
+
+    旧版本这里自己写了一套（DSH_PLUGIN_DIR → `_paths.ROOT/distillation-director-plugin` → 逐级上溯），
+    与 `verify_pack_manifest.py` 里的另一套**互不一致**（后者把 `tools\` 当成了包）。
+    **同一个问题两套规则 ⇒ 两个闸对同一台机器给出不同结论**，这正是 `A-133`。
+    """
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        if here not in sys.path:
+            sys.path.insert(0, here)
+        from _plugdir import resolve_plugin_dir
+        return resolve_plugin_dir(explicit, need_manifest=False, here=__file__)
+    except ImportError:
+        pass
+    # 兜底（`_plugdir.py` 不在场时）：只保留"工作台布局"这一条，**不再猜别的**
     try:
         here = os.path.dirname(os.path.abspath(__file__))
         if here not in sys.path:
@@ -52,14 +83,8 @@ def _resolve_plug(explicit=None):
         p = os.path.join(ROOT, 'distillation-director-plugin')
         if os.path.isdir(p):
             return p
-    except Exception:
+    except BaseException:
         pass
-    d = os.path.dirname(os.path.abspath(__file__))
-    for _ in range(6):
-        p = os.path.join(d, 'distillation-director-plugin')
-        if os.path.isdir(p):
-            return p
-        d = os.path.dirname(d)
     return None
 
 
@@ -106,16 +131,27 @@ def collect_claims(plug):
     #    ⚠ 自伤（首跑实测抓到）：原判据写"版本表**首行**＝当前版本"，而本 README 的版本表是
     #    **从旧到新**排列（首行是 v4.1）⇒ 该判据**恒红**（拿"表的排列顺序"当"版本新旧的判据"）。
     #    正确判据：**当前版本那一行存在 ＋ 它带"本版"标记 ＋ 别的行不带**（这才是"文档已更新到本版"）。
-    def _row_of(v):
-        m = re.search(r'^\|\s*\*{0,2}v%s\*{0,2}\s*\|(.*)$' % re.escape(v), rd, re.M)
-        return m.group(1) if m else None
-    cur = _row_of(ver)
-    others_benban = [ln for ln in re.findall(r'^\|\s*\*{0,2}v(\d+\.\d+\.\d+)\*{0,2}\s*\|.*$', rd, re.M)
-                     if ln != ver]
-    benban_others = re.findall(r'^\|\s*\*{0,2}v(\d+\.\d+\.\d+)\*{0,2}\s*\|.*本版.*$', rd, re.M)
-    ok3 = (cur is not None) and ('本版' in cur) and (benban_others == [ver])
-    rows.append(('README 版本表含本版行', ver if cur is not None else '(无该版本行)', ver,
-                 ok3, '"当前版本那一行"必须存在且标"本版"，且**只有它**标（表序新旧不限）'))
+    def _marks_benban(line):
+        """只有"某个单元格**以**本版开头"才算标记。
+
+        ⚠ 自伤（2026-09-19 第二批实测）：旧判据用 `.*本版.*` 扫整行，
+        而 v4.9.11 那一行的**正文里恰好引用了这个词**（"版本表\"本版\"行"）
+        ⇒ 把"上一版"的历史行判成了并存的"本版"行，**闸自己报假红**。
+        这正是 `A-136`/`A-36` 家族：**判据必须锚定结构位（单元格开头），不能扫自由文本**。
+        """
+        return any(re.match(r'^\*{0,2}本版', c.strip()) for c in line.split('|'))
+
+    cur_line = None
+    for ln in rd.split('\n'):
+        if re.match(r'^\|\s*\*{0,2}v%s\*{0,2}\s*\|' % re.escape(ver), ln):
+            cur_line = ln
+            break
+    marked = [re.search(r'^\|\s*\*{0,2}v(\d+\.\d+\.\d+)', ln).group(1)
+              for ln in rd.split('\n')
+              if re.match(r'^\|\s*\*{0,2}v\d+\.\d+\.\d+\*{0,2}\s*\|', ln) and _marks_benban(ln)]
+    ok3 = (cur_line is not None) and _marks_benban(cur_line) and (marked == [ver])
+    rows.append(('README 版本表含本版行', ver if cur_line is not None else '(无该版本行)', ver,
+                 ok3, '"当前版本那一行"必须存在且标"本版"，且**只有它**标（判据锚定单元格开头）'))
     # ③-b 目录结构里的"SKILL 权威版本"（上一项②）
     m4 = re.search(r'SKILL\.md\s+技能正文（\*{0,2}V(\d+\.\d+\.\d+)\s*权威', rd)
     rows.insert(2, ('README 目录结构里的版本', m4.group(1) if m4 else '(未声明)', ver,
@@ -134,11 +170,72 @@ def collect_claims(plug):
     rows.append(('README 一级标题里的版本', m5.group(1) if m5 else '(未声明)', ver,
                  (m5 is not None and m5.group(1) == ver),
                  '一级标题是页面上最显眼的版本号，最容易漏升'))
+    # ⑦ SKILL.md 里的**同一个声明**（实测：上一批只看住 README，SKILL.md 件数静默停在 34）
+    skp = os.path.join(plug, 'SKILL.md')
+    sk = io.open(skp, encoding='utf-8').read() if os.path.isfile(skp) else ''
+    # ⚠ `R38` 的落实：**不是"找到第一个声明就对"，而是"所有声明位都必须对"**。
+    #   首版用 `re.search`（只看第一处）——那等于把"每个声明位都是独立失效点"这条规矩**又违反一次**。
+    m6all = re.findall(r'门禁套件（\*{0,2}(\d+)\s*件', sk)
+    if not sk:
+        rows.append(('SKILL.md「门禁套件 N 件」', '(无 SKILL.md)', '%d 件' % n_real, True,
+                     'SKILL.md 不在场 ⇒ 本项不适用（在场性由 verify_plugin_pack 管）'))
+    else:
+        _ok6 = bool(m6all) and all(int(x) == n_real for x in m6all)
+        rows.append(('SKILL.md「门禁套件 N 件」',
+                     '／'.join(m6all) if m6all else '(未声明)',
+                     '%d 件（%s；声明位 %d 处，须**全部**一致）' % (n_real, src, max(len(m6all), 1)),
+                     _ok6,
+                     'R38：同一事实的每个声明位都是独立失效点（上一批只查 README，SKILL.md 静默漂 3 版）'))
+    # ⑧ 内部手册：声明位 ＋ 路径位 ＋ 反向判据（详见模块 docstring 的「⑧ 的射程」）
+    MAN = '蒸馏工程避坑手册'
+    in_pack = []
+    for dirpath, _dirs, files in os.walk(plug):
+        for f in files:
+            if MAN in f:
+                in_pack.append(os.path.relpath(os.path.join(dirpath, f), plug))
+    if tgz:
+        with tarfile.open(tgz) as tf:
+            in_pack += [m.name for m in tf.getmembers() if m.isfile() and MAN in m.name]
+    notship = ('不随包发行', '不随包', '不随插件发行')
+    probs = []
+    # ⑧-1 §0.0 B 段（"哪些随包／哪些不随包"的清单）
+    mb = re.search(r'^###\s*B\.[^\n]*\n(.*?)(?=^###\s|\Z)', sk, re.S | re.M)
+    if mb and MAN in mb.group(1) and not any(k in mb.group(1) for k in notship):
+        probs.append('§0.0 B 段（随包清单）提到内部手册却未注明不随包')
+    # ⑧-2 §18.3 标题
+    mh = re.search(r'^###\s*18\.3[^\n]*$', sk, re.M)
+    if mh and not any(k in mh.group(0) for k in notship):
+        probs.append('§18.3 标题未注明内部手册不随包')
+    # ⑧-3 路径位（给了可打开路径 ⇒ 暗示读者手里有）
+    lines = sk.split('\n')
+    for i, ln in enumerate(lines):
+        if re.search(r'`[^`]*%s\.md`' % MAN, ln):
+            win = '\n'.join(lines[max(0, i - 3):i + 4])
+            if not any(k in win for k in notship):
+                probs.append('SKILL.md 第 %d 行给出内部手册路径但邻近 3 行未注明不随包' % (i + 1))
+    if sk and MAN not in sk:
+        probs.append('SKILL.md 全文未提内部手册（应至少说明它不随包）')
+    # ⑧-4 反向判据：包内不得真的躺着手册
+    if in_pack:
+        probs.append('包内出现了内部手册：%s' % ', '.join(sorted(set(in_pack))[:3]))
+    rows.append(('内部手册：不随包声明 ＋ 包内不存在',
+                 '不随包（声明位＋路径位）' if not probs else '；'.join(probs[:2]),
+                 '包内 %d 处' % len(in_pack), not probs,
+                 'A-137：移除类改动必须在**声明侧**闭环（tar 只增不删）'))
     return rows
 
 
+def _good_skill(n=4, mark=True):
+    """好样本的 SKILL.md：三个声明位都齐（件数／B 段／18.3 标题／路径位）。"""
+    ym = '、**不随包发行**（作者本地）' if mark else ''
+    return ('### B. **只在原工作区存在**（别人电脑上没有）\n'
+            '《蒸馏工程避坑手册》`蒸馏工程避坑手册.md`%s。\n'
+            '门禁套件（%d 件，随包发行）\n'
+            '### 18.3 《蒸馏工程避坑手册》（作者本地资料%s）\n' % (ym, n, ym))
+
+
 def selftest():
-    """坏样本必须被检出（声明数与实物不一致）。"""
+    """坏样本必须被检出（声明数与实物不一致 ＋ 手册声明位缺失）。"""
     import shutil
     import tempfile
     d = tempfile.mkdtemp(prefix='pubnum_')
@@ -151,13 +248,14 @@ def selftest():
         io.open(os.path.join(gd, '防坑要点-TOP20.md'), 'w', encoding='utf-8').write('x')
         io.open(os.path.join(d, 'package.json'), 'w', encoding='utf-8').write(
             json.dumps({'version': '9.9.9', 'description': 'x'}, ensure_ascii=False))
+        io.open(os.path.join(d, 'SKILL.md'), 'w', encoding='utf-8').write(_good_skill(4))
         # 好样本：声明 4 件（含要点版）＝实际 4 件
         io.open(os.path.join(d, 'README.md'), 'w', encoding='utf-8').write(
             '# 某插件 V9.9.9\nSKILL.md 技能正文（**V9.9.9 权威**）\n门禁与工具 4 件\n| **v9.9.9** | x | **本版** |\n')
         rows = collect_claims(d)
         bad = [r for r in rows if not r[3]]
         good = not bad
-        print('  %s 好样本放行（声明＝实物）' % ('✔' if good else '🔴 %s' % bad))
+        print('  %s 好样本放行（声明＝实物，%d 项）' % ('✔' if good else '🔴 %s' % bad, len(rows)))
         ok &= good
         # 坏样本：改成 34（实物 4）
         io.open(os.path.join(d, 'README.md'), 'w', encoding='utf-8').write(
@@ -184,9 +282,25 @@ def selftest():
         hit = any((not r[3]) and '要点版' in r[0] for r in rows)
         print('  %s 坏样本③承诺随带的文件缺失被检出' % ('✔' if hit else '🔴'))
         ok &= hit
+        # 坏样本④：**SKILL.md 里的同一件数声明**漂了（实物 3 件；这是上一批的真实漏检形态）
+        io.open(os.path.join(gd, '防坑要点-TOP20.md'), 'w', encoding='utf-8').write('x')
+        io.open(os.path.join(d, 'README.md'), 'w', encoding='utf-8').write(
+            '# 某插件 V9.9.9\nSKILL.md 技能正文（**V9.9.9 权威**）\n门禁与工具 4 件\n| **v9.9.9** | x | **本版** |\n')
+        io.open(os.path.join(d, 'SKILL.md'), 'w', encoding='utf-8').write(_good_skill(34))
+        rows = collect_claims(d)
+        hit = any((not r[3]) and r[0].startswith('SKILL.md「门禁套件') for r in rows)
+        print('  %s 坏样本④SKILL.md 里的件数漂移被检出（声明 34 vs 实物 4）' % ('✔' if hit else '🔴'))
+        ok &= hit
+        # 坏样本⑤：手册声明位缺失 ＋ 包内**真的**躺着手册（tar 只增不删的典型残留）
+        io.open(os.path.join(d, 'SKILL.md'), 'w', encoding='utf-8').write(_good_skill(4, mark=False))
+        io.open(os.path.join(d, '蒸馏工程避坑手册.md'), 'w', encoding='utf-8').write('x')
+        rows = collect_claims(d)
+        hit = any((not r[3]) and r[0].startswith('内部手册') for r in rows)
+        print('  %s 坏样本⑤手册声明位缺失＋包内残留被检出' % ('✔' if hit else '🔴'))
+        ok &= hit
     finally:
         shutil.rmtree(d, ignore_errors=True)
-    print('  %s 自证%s' % ('✔' if ok else '🔴', '通过（3 类坏样本全拦 ＋ 好样本放行）' if ok else '失败'))
+    print('  %s 自证%s' % ('✔' if ok else '🔴', '通过（5 类坏样本全拦 ＋ 好样本放行）' if ok else '失败'))
     return ok
 
 

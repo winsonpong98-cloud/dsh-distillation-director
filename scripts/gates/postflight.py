@@ -637,18 +637,51 @@ def main():
     else:
         _rc1, _so1, _ = run([sys.executable, _pn, '--selftest'])
         _ok1 = ('自证通过' in _so1) and _rc1 == 0
-        rec('public:闸自证(A-135)', '3 类坏样本全拦（rc=0）',
+        # ⚠ 读数必须**从闸的输出派生**，不得在这里写死（2026-09-19 第二批：闸已由 3 类坏样本
+        #   扩到 5 类、由 6 项扩到 9 项，而本处文案仍写旧数 ⇒ **门禁自己的报告成了"对外数字"的漂移点**，
+        #   与 A-135 同族。凡"某一处声明某个数"的地方都是独立失效点（A-138）。
+        _m1 = re.search(r'自证通过（(\d+)\s*类坏样本', _so1)
+        _n1 = (_m1.group(1) + ' 类坏样本全拦') if _m1 else '自证通过'
+        rec('public:闸自证(A-135)', '%s（rc=0）' % _n1,
             ('✔ 自证通过' if _ok1 else '🔴 见输出'), _ok1,
-            'A-135：闸必须先证明能拦"件数不一致／版本不一致／承诺随带件缺失"')
+            'A-135：闸必须先证明能拦"件数不一致／版本不一致／承诺随带件缺失／SKILL.md 声明数漂移／手册声明位缺失"')
         _rc2, _so2, _ = run([sys.executable, _pn])
         _ok2 = _rc2 == 0
         _bad = [l.strip() for l in _so2.splitlines() if '🔴' in l][:3]
-        rec('public:声明≡实物(A-135)', '6 项逐项一致（rc=0）',
+        _m2 = re.search(r'逐项一致（(\d+)\s*项）', _so2)
+        _n2 = (_m2.group(1) + ' 项逐项一致') if _m2 else '逐项一致'
+        rec('public:声明≡实物(A-135)', '%s（rc=0）' % _n2,
             ('✔ 一致' if _ok2 else '🔴 ' + '｜'.join(_bad)), _ok2,
-            'A-135：README 的件数/版本/承诺随带件必须等于发行件里的实物')
+            'A-135：README/SKILL 的件数·版本·承诺随带件·内部手册声明位必须等于发行件里的实物')
+
+    # ⑯ 插件目录解析唯一来源（A-133 第二现场 · 2026-09-19 第二批挂入 · 只读）
+    #   依据：同一问题"插件目录在哪"被两个闸各写一套 ⇒ `verify_pack_manifest.py` 从 `tools\` 运行时
+    #   把 `tools\` 自己当成了包，去 `tools\scripts\gates\` 找清单，**报"找不到清单 ⇒ 重装 4.9.10+"**
+    #   —— 路径解析错却说成"你的包太旧"（**误导性错误比崩溃更坏**）。
+    #   本项自证 `_plugdir.py`（唯一来源）能扛：包内上溯／包根／显式参数命中，空上下文与缺清单的包**不猜**。
+    print('\n⑯ 插件目录解析唯一来源（A-133 · 只读）')
+    _pd = os.path.join(TOOLS, '_plugdir.py')
+    if not os.path.exists(_pd):
+        _pd = os.path.join(TOOLS, 'scripts', 'gates', '_plugdir.py')
+    if not os.path.exists(_pd):
+        rec('plugdir:解析器在位(A-133)', '`tools\\_plugdir.py` 在位', '🔴 缺', False,
+            'A-133：解析规则必须只有一份')
+    else:
+        _rc3, _so3, _ = run([sys.executable, _pd, '--selftest'])
+        _ok3 = ('自证通过' in _so3) and _rc3 == 0
+        # 同一台机器上必须真能解析出插件目录（"单一来源"要落到现场，不是纸面主张）
+        _rc4, _so4, _ = run([sys.executable, _pd])
+        _m3 = re.search(r'解析结果：(.+)', _so4)
+        _resolved = _m3.group(1).strip() if _m3 else ''
+        _same = bool(_resolved) and os.path.isdir(_resolved)
+        rec('plugdir:解析器自证(A-133)', '3 正 3 负全过（rc=0）＋ 现场可解析出真实目录',
+            ('✔ 自证通过' if _ok3 else '🔴 见输出')
+            + (' ｜ 现场＝%s' % os.path.basename(_resolved) if _same else ' ｜ 🔴 现场解析失败'),
+            _ok3 and _same,
+            'A-133：解析器必须先证明"该中的中、不该猜的不猜"，且在本机真能解析出目录')
 
     bad = [r for r in results if r['verdict'] == 'FAIL']
-    print('\n结论：%s' % ('✔ 改后门禁全绿（%d 项检查 · 含⑧教育线四闸＋⑨子模式自检＋⑩格式判据活性＋⑪Windows .cmd/退出码判空＋⑫写死版号巡检＋⑬波段 id 单源＋⑭随包清单双向＋⑮对外数字一致）' % len(results) if not bad
+    print('\n结论：%s' % ('✔ 改后门禁全绿（%d 项检查 · 含⑧教育线四闸＋⑨子模式自检＋⑩格式判据活性＋⑪Windows .cmd/退出码判空＋⑫写死版号巡检＋⑬波段 id 单源＋⑭随包清单双向＋⑮对外数字一致＋⑯插件目录解析单源）' % len(results) if not bad
                         else '🔴 %d 项不符，不得宣布"改完"' % len(bad)))
     for r in bad:
         print('   - %s：期望 %s ／ 实测 %s' % (r['gate'], r['expect'], r['actual']))
