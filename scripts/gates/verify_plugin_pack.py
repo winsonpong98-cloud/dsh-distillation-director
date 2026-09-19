@@ -51,7 +51,32 @@ SKILL = os.path.join(ROOT, '.dsh', 'skills', 'distillation-director', 'SKILL.md'
 # --- C-9：把"写死版本"换成"从 package.json 推导"（v1 曾把版本与两个 tgz 文件名钉死在这里） ---
 import glob as _glob
 _pjf = os.path.join(PLUG, 'package.json')
-VER = json.loads(io.open(_pjf, encoding='utf-8').read())['version']
+
+
+def _read_ver(pjf):
+    """读插件目录的 `package.json` 版本；**读不到就返回 None，绝不抛异常**。
+
+    ⚠ 2026-09-19 NAS 真机 ＋ 发版闸 E 判据实测（两处同时抓到）：
+    原写法 `VER = json.loads(io.open(_pjf).read())['version']` 是**无条件读文件** ⇒
+    在"别人电脑上/无插件目录"的环境里直接 `FileNotFoundError` **裸栈**（本闸是随包发行的闸，
+    这正是发版闸 E 判据要拦的形态）。**根因＝把"本机一定有这个目录"当成了前提。**
+    正确语义：**读不到版本 ⇒ 本闸不适用 ＋ 打印原因与处置 ＋ 退出码 2**（不裸栈、不假绿）。
+    """
+    try:
+        return json.loads(io.open(pjf, encoding='utf-8').read())['version']
+    except Exception:
+        return None
+
+
+VER = _read_ver(_pjf)
+if not VER:
+    print('ℹ 解包级校验**不适用**：本机找不到插件目录的 `package.json`。')
+    print('   路径：%s' % _pjf)
+    print('   原因：本闸比对的是"发行件 ↔ 工作台权威层"，需要工作台里的插件目录在场；')
+    print('         在别人电脑上只装发行包、没有工作台源代码时**属正常**。')
+    print('   处置：在工作台里跑（`<工作区>/distillation-director-plugin/package.json` 在场），')
+    print('         或用 `--all` 前先确认插件目录已就位。')
+    sys.exit(2)
 FLAT = os.path.join(ROOT, 'dsh-distillation-director-v%s.tgz' % VER)
 NPMV = os.path.join(PLUG, 'dsh-distillation-director-%s.tgz' % VER)
 if '--all' in sys.argv:
@@ -68,15 +93,42 @@ def md5(p):
     return hashlib.md5(io.open(p, 'rb').read()).hexdigest()
 
 
-ref = {s: md5(os.path.join(MACH, s)) for s in SCRIPTS}
+def md5_or_none(p):
+    """基准件缺失时返回 None —— **不得抛异常**。
+
+    ⚠ 2026-09-19 NAS 真机实测（本闸在本机全绿、在真机裸栈）：
+    机器层脚本目录（原书树里的 `三闸机器化\\`）**只在作者工作区存在**；
+    换台电脑/新装用户的机器上没有它 ⇒ 旧版直接
+    `FileNotFoundError: /workspace/投资蒸馏/三闸机器化/machine_precheck_v2.py` **整条崩掉**。
+    同族＝`A-115`「缺目录当异常」＋ 发版闸 E 判据的**射程漏洞**：
+    E 只在"作者机器上模拟异机"，而作者机器上那些基准件**恰好都在** ⇒ 永远测不出这一形态。
+    正确语义：**基准件不在场 ⇒ 该比对判"不适用"并打印原因**（不判红、也不假绿）。
+    """
+    return md5(p) if os.path.isfile(p) else None
+
+
+ref = {s: md5_or_none(os.path.join(MACH, s)) for s in SCRIPTS}
 # 门禁套件：权威源在 `tools\`，包内 `scripts/gates/`（A-81）
 GATES = ['gate_start.py', 'gate_stage.py', 'gate_checklist.py', 'preflight.py', 'postflight.py', 'gate_selftest.py', 'pitfall_audit.py', 'gate_common.py', 'gate_bootstrap.py', 'check_judge_pack.py']
-GATES_REF = {g: md5(os.path.join(ROOT, 'tools', g)) for g in GATES}
-ref_skill = md5(SKILL)
+GATES_REF = {g: md5_or_none(os.path.join(ROOT, 'tools', g)) for g in GATES}
+ref_skill = md5_or_none(SKILL)
+_missing = ([s for s, h in ref.items() if h is None] + [g for g, h in GATES_REF.items() if h is None])
 print('=== 权威基准（package.json 版本 %s） ===' % VER)
+if _missing:
+    print('  ℹ **不适用项**：本机缺 %d 个权威基准件 ⇒ 与它们的比对**跳过**（不判红、不假绿）' % len(_missing))
+    print('     缺件：%s' % '、'.join(_missing[:8]) + ('…' if len(_missing) > 8 else ''))
+    print('     原因：机器层脚本目录 = `MACH`（原书树内，**只在作者工作区存在**）；'
+          '`tools\\` 权威工具目录同理。换台电脑/新装用户没有它们**属正常**。')
+    print('     仍然照常执行的校验：包内文件在场性 ／ 逐件 md5 与**包内清单**一致 ／ 元数据 ／ 反向判据（无内部手册）。')
 for s in SCRIPTS:
+    if ref[s] is None:
+        print('  %-34s （不适用：本机缺 `MACH/%s`）' % (s, s))
+        continue
     print('  %-34s %s  (%d 字节)' % (s, ref[s], os.path.getsize(os.path.join(MACH, s))))
-print('  %-34s %s  (%d 字节)' % ('SKILL.md（权威技能）', ref_skill, os.path.getsize(SKILL)))
+if ref_skill is None:
+    print('  %-34s （不适用：本机缺权威技能件）' % 'SKILL.md（权威技能）')
+else:
+    print('  %-34s %s  (%d 字节)' % ('SKILL.md（权威技能）', ref_skill, os.path.getsize(SKILL)))
 
 ok_all = True
 for tgz in TGZ:
@@ -123,14 +175,23 @@ for tgz in TGZ:
             if not os.path.exists(p):
                 print('  ✗ 缺 %s' % s); ok = False; continue
             h = md5(p)
+            if ref[s] is None:
+                # 基准件不在场：**只报在场性，不判同源**（不假绿：打印"未比对"）
+                print('  ✔ %-34s %s  (%d 字节)  ← 在场；与权威基准**未比对**（本机缺基准件）'
+                      % (s, h, os.path.getsize(p)))
+                continue
             good = (h == ref[s])
             ok &= good
             print('  %s %-34s %s  (%d 字节)' % ('✔' if good else '🔴', s, h, os.path.getsize(p)))
     if sk:
         h = md5(sk)
-        good = (h == ref_skill)
-        ok &= good
-        print('  %s %-34s %s  (%d 字节)' % ('✔' if good else '🔴', 'SKILL.md', h, os.path.getsize(sk)))
+        if ref_skill is None:
+            print('  ✔ %-34s %s  (%d 字节)  ← 在场；与权威技能**未比对**（本机缺基准件）'
+                  % ('SKILL.md', h, os.path.getsize(sk)))
+        else:
+            good = (h == ref_skill)
+            ok &= good
+            print('  %s %-34s %s  (%d 字节)' % ('✔' if good else '🔴', 'SKILL.md', h, os.path.getsize(sk)))
     else:
         print('  ✗ 包内无 SKILL.md'); ok = False
     if pj:
@@ -143,6 +204,31 @@ for tgz in TGZ:
               % ('✔' if (not miss and vok) else '🔴', j.get('version'), VER, miss if miss else '无'))
     else:
         print('  ✗ 包内无 package.json'); ok = False
+    # --- 门禁套件逐件比对（2026-09-19 第二批补：原 `GATES`／`GATES_REF` **建了却从未使用**）---
+    #   一条"建了不使用"的判据＝**纸面判据**（`A-98`／`A-123` 家族）：它出现在输出里让人以为查过，
+    #   实际上从未比对。本批把它接上（本机有 `tools\` 时逐件比 md5；异机无基准件则**只报在场性**）。
+    _gsp = os.path.join(sp, 'gates') if sp else None
+    if _gsp and os.path.isdir(_gsp):
+        _gmiss, _gbad, _gskip = [], [], 0
+        for g in GATES:
+            gp = os.path.join(_gsp, g)
+            if not os.path.isfile(gp):
+                _gmiss.append(g); continue
+            if GATES_REF[g] is None:
+                _gskip += 1; continue
+            if md5(gp) != GATES_REF[g]:
+                _gbad.append(g)
+        if _gmiss or _gbad:
+            ok = False
+            print('  🔴 包内门禁套件：缺 %d 件%s ／ 与权威不一致 %d 件%s'
+                  % (len(_gmiss), ('（%s）' % '、'.join(_gmiss[:5])) if _gmiss else '',
+                     len(_gbad), ('（%s）' % '、'.join(_gbad[:5])) if _gbad else ''))
+        else:
+            print('  ✔ 包内门禁套件在场且与权威逐件一致（比对 %d 件%s）'
+                  % (len(GATES) - _gskip, '；%d 件未比对＝本机缺基准' % _gskip if _gskip else ''))
+    else:
+        print('  ℹ 包内未找到 `scripts/gates/`（旧版包形态）⇒ 门禁套件比对不适用')
+
     # 附加（2026-09-19 脱敏批 · 用户拍板方案乙）：**不再随包 manual-history 与完整内部手册**。
     #   判据改为**反向**——包内**不得**出现它们（防"哪天又悄悄带回去"），并确认通用要点版在场。
     _leak = sorted({m.split('/')[1] if m.count('/') > 1 else m for m in members

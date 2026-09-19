@@ -85,7 +85,10 @@ CANON = BID.BAND + '-'          # `[A-Za-z][A-Za-z0-9]*-`  ← 唯一允许出�
 WAIVER_LINE = 'BANDID-OK-LINE'
 WAIVER_FILE = 'BANDID-OK-FILE'
 EXTS = ('.py', '.mjs', '.cjs', '.json')
-SKIP_DIRS = {'__pycache__', 'node_modules', '.git'}
+# 跳过目录：加了 4 类**归档/旧版**目录——2026-09-19 把"随包副本"纳入射程时必须排除它们，
+# 否则 `_old-releases\**` 里各旧版包的旧语料会把闸判红（那是**归档**，不是现行面）。
+SKIP_DIRS = {'__pycache__', 'node_modules', '.git', '_old-releases', '.pytest_cache', '.mypy_cache'}
+SKIP_DIR_PREFIX = ('_stale-', '_quarantine-', '_removed-', '.bak-')
 
 # 残片探测：`[A-Za-z]` ＋ ≤16 个非空白字符 ＋ `-` ＋（`\d` 或 `[0-9]`）
 #   **捕获组 1 = 前缀（含结尾的 `-`）** —— 与唯一真源比对的就是它；
@@ -259,34 +262,56 @@ def main():
         print('=' * 84)
         return selftest()
     if a.tools:
-        tools = os.path.abspath(a.tools)
+        roots = [os.path.abspath(a.tools)]
     else:
         root = _resolve_root(a.root)
-        tools = os.path.join(root, 'tools')
-    if not os.path.isdir(tools):
-        sys.exit('🔴 目录不存在：%s' % tools)
+        roots = [os.path.join(root, 'tools')]
+        # ⚠ 射程扩展（2026-09-19 · NAS 真机反证）：**随包副本也是"声明位"**。
+        #   定位过程：真机跑本闸判红 3 处，而本机全绿——查下去发现真机判红的是**宿主侧
+        #   `tools\` 的陈旧副本**（419 行旧版），随包副本是干净的；同时暴露出**本闸默认只扫
+        #   `<root>/tools`**，随包副本（`scripts/gates/`）**从来没被扫过**。
+        #   这正是 `A-139`："同一事实的每个声明位都是独立失效点"。故补扫随包目录（在场才扫）。
+        _pkg = os.path.join(root, 'distillation-director-plugin', 'scripts', 'gates')
+        if os.path.isdir(_pkg):
+            roots.append(_pkg)
+    for _r in roots:
+        if not os.path.isdir(_r):
+            sys.exit('🔴 目录不存在：%s' % _r)
 
     print('波段 id 语法单一来源闸（A-132）')
-    print('唯一真源：%s\\_bandid.py ｜ 允许写法：`%s`' % (tools, CANON))
+    # ⚠ 修两处（2026-09-19 NAS 真机实测）：
+    #   ① 原写 `'%s\\_bandid.py' % (tools, …)` —— **硬写 Windows 反斜杠** ⇒ 真机打印出
+    #      `/workspace/tools\_bandid.py`（跨平台显示缺陷，F 判据家族）；
+    #   ② 原把**被扫目录**当成"唯一真源目录"打印 ⇒ 当 `--tools` 指向别处时，
+    #      报告"真源在哪"这一行是**错的**（同一个 `A-139`：报告与实际必须同源）。
+    #   真源永远是与本文件同目录的 `_bandid.py`。
+    print('唯一真源：%s ｜ 允许写法：`%s`' % (os.path.join(_HERE, '_bandid.py'), CANON))
     print('=' * 84)
 
     scanned, hits, waived = 0, [], []
-    for dp, dn, fn in os.walk(tools):
-        dn[:] = [d for d in dn if d not in SKIP_DIRS]
-        for f in sorted(fn):
-            if not f.endswith(EXTS):
-                continue
-            p = os.path.join(dp, f)
-            scanned += 1
-            try:
-                txt = io.open(p, encoding='utf-8', errors='replace').read()
-            except Exception:
-                continue
-            if WAIVER_FILE in txt and f != '_bandid.py':
-                waived.append(os.path.relpath(p, tools))
-                continue
-            for ln, frag in scan_text(p):
-                hits.append((os.path.relpath(p, tools), ln, frag))
+    for tools in roots:
+        _n0, _h0 = scanned, len(hits)
+        for dp, dn, fn in os.walk(tools):
+            dn[:] = [d for d in dn
+                     if d not in SKIP_DIRS and not d.startswith(SKIP_DIR_PREFIX)]
+            for f in sorted(fn):
+                if not f.endswith(EXTS):
+                    continue
+                p = os.path.join(dp, f)
+                scanned += 1
+                try:
+                    txt = io.open(p, encoding='utf-8', errors='replace').read()
+                except Exception:
+                    continue
+                if WAIVER_FILE in txt and f != '_bandid.py':
+                    waived.append(os.path.relpath(p, tools))
+                    continue
+                for ln, frag in scan_text(p):
+                    hits.append((os.path.relpath(p, tools), ln, frag))
+        print('扫描根：%s（扫 %d 文件 ／ 新增命中 %d）'
+              % (tools, scanned - _n0, len(hits) - _h0))
+    # 去重（多根扫描时同一豁免件会出现两次）+ 报告里带上是哪个根，避免"看着像两件"
+    waived = sorted(set(waived))
 
     print('已扫 %d 个文件' % scanned)
     if waived:

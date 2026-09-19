@@ -78,43 +78,88 @@ def check_ref_closure(tmp, names, opt=None):
 
 
 def check_foreign_no_traceback(tmp, names):
-    """E 异机 0 裸栈：包内门禁在"无 DSH 数据/无 .dsh 祖先"的临时目录里跑，断言无 Traceback。"""
+    r"""E 异机 0 裸栈：包内门禁在"无 DSH 数据/无 .dsh 祖先"的临时目录里跑，断言无 Traceback。
+
+    ⚠ **射程漏洞（2026-09-19 NAS 真机反证）**：本判据原先只在"**作者机器上**模拟异机"，
+    而作者机器上那些**基准件恰好都在**（原书树的机器层脚本目录、`tools\` 权威目录）⇒
+    `verify_plugin_pack.py` 在本机永远绿，**在真机上 `FileNotFoundError` 裸栈**。故改为跑两轮：
+      E-1 无 DSH 环境（原判据）；
+      E-2 **基准件缺失**：`DSH_GATE_CONFIG` 指向一份"各目录都不存在"的配置 ⇒
+          读基准件的闸必须**判"不适用"并打印原因**，不得裸栈。
+
+    ⚠ **本判据自己更严重的缺陷（本批实测抓到）：E 此前是「空转」的**——
+    拷贝夹具写的是 `tmp/scripts/...`，而 **npm 形态的包根是 `tmp/package/scripts/...`**
+    ⇒ **一支门禁都没被跑到**，却打印"✔ 0 裸栈"。这正是 `A-36` 家族最坏的一种：
+    **闸看起来在查、其实什么都没查**（而它当时正是我引证"异机可跑"的那条证据）。
+    修法两条：① 先**找真实包根**（不假设前缀）再拷夹具；② **把实跑支数返回给调用方，0 支即判红**。
+
+    返回 `(异常清单, E-1 实跑支数, E-2 实跑支数)`。
+    """
     fx = tempfile.mkdtemp(prefix='E_foreign_')
     env = {k: v for k, v in os.environ.items() if not k.startswith('DSH_')}
     env['PYTHONIOENCODING'] = 'utf-8'
-    bad = []
+    # ① 找**真实包根**：任意一层 `*/scripts/gates` 的上一级（兼容 `package/` 前缀与扁平两种形态）
+    _root = tmp
+    for _d, _dirs, _fs in os.walk(tmp):
+        if os.path.basename(_d) == 'gates' and os.path.basename(os.path.dirname(_d)) == 'scripts':
+            _root = os.path.dirname(os.path.dirname(_d))
+            break
+    _gsrc, _ssrc = os.path.join(_root, 'scripts', 'gates'), os.path.join(_root, 'scripts')
+    if not os.path.isdir(_gsrc):
+        shutil.rmtree(fx, ignore_errors=True)
+        return [('（E 判据）', '包内找不到 `scripts/gates/` ⇒ 无法仿真（判红，不静默放行）')], 0, 0
     # 整目录拷贝（模拟真实安装：包内 gates\ 与 scripts\ 一起装）——
     # 旧版只拷单个文件 ⇒ gate_common/_paths 导入失败被误判为"异机崩"（夹具伪影）
-    for _sub in ('scripts/gates', 'scripts'):
-        _sd = os.path.join(tmp, _sub.replace('/', os.sep))
-        if os.path.isdir(_sd):
-            for _f in os.listdir(_sd):
-                if _f.endswith(('.py', '.json')):
-                    shutil.copy2(os.path.join(_sd, _f), os.path.join(fx, _f))
-    eydir = os.path.join(fx, 'gates')
-    if os.path.isdir(os.path.join(tmp, 'scripts', 'gates')):
-        os.makedirs(eydir, exist_ok=True)
-        for _f in os.listdir(os.path.join(tmp, 'scripts', 'gates')):
-            if _f.endswith('.py'):
-                shutil.copy2(os.path.join(tmp, 'scripts', 'gates', _f), os.path.join(eydir, _f))
-    for n in names:
-        if "/gates/" not in n.replace('\\', '/') or not n.endswith('.py'):
+    for _sd in (_gsrc, _ssrc):
+        if not os.path.isdir(_sd):
             continue
-        dst = os.path.join(fx, os.path.basename(n))
-        if not os.path.isfile(dst):
-            continue
-        try:
-            r = subprocess.run([sys.executable, dst], capture_output=True, text=True,
-                               encoding='utf-8', errors='replace', env=env, cwd=fx, timeout=150)
-            out = (r.stdout or '') + (r.stderr or '')
-        except subprocess.TimeoutExpired:
-            bad.append((os.path.basename(n), '超时'))
-            continue
-        if 'Traceback' in out:
-            line = next((l.strip() for l in out.split('\n') if 'Error' in l), 'Traceback')
-            bad.append((os.path.basename(n), line[:70]))
+        for _f in os.listdir(_sd):
+            if _f.endswith(('.py', '.json')):
+                shutil.copy2(os.path.join(_sd, _f), os.path.join(fx, _f))
+    _ey = os.path.join(fx, 'gates')
+    os.makedirs(_ey, exist_ok=True)
+    for _f in os.listdir(_gsrc):
+        if _f.endswith('.py'):
+            shutil.copy2(os.path.join(_gsrc, _f), os.path.join(_ey, _f))
+
+    def _run_all(envx, tag):
+        bad, ran = [], 0
+        for n in sorted({os.path.basename(x) for x in names
+                         if "/gates/" in x.replace('\\', '/') and x.endswith('.py')}):
+            dst = os.path.join(fx, n)
+            if not os.path.isfile(dst):
+                continue
+            ran += 1
+            try:
+                r = subprocess.run([sys.executable, dst], capture_output=True, text=True,
+                                   encoding='utf-8', errors='replace', env=envx, cwd=fx, timeout=150)
+                out = (r.stdout or '') + (r.stderr or '')
+            except subprocess.TimeoutExpired:
+                bad.append((n, '%s 超时' % tag))
+                continue
+            if 'Traceback' in out:
+                # ⚠ 打印长度 70 → 200（`A-117` 的教训：**裁剪过的错误信息会把人引错方向**——
+                #   首跑只看到 `...C:\Users\A`，根本判断不出是哪个文件读不到）。
+                line = next((l.strip() for l in out.split('\n') if 'Error' in l), 'Traceback')
+                bad.append((n, '%s：%s' % (tag, line[:200])))
+        return bad, ran
+
+    bad, _ran1 = _run_all(env, 'E-1 异机')
+    # E-2 基准件缺失：造一份"目录都不存在"的 gate 配置（真机新装用户就是这个形态）
+    _gap = tempfile.mkdtemp(prefix='E_gapcfg_')
+    _cfgp = os.path.join(_gap, 'workspace.json')
+    with io.open(_cfgp, 'w', encoding='utf-8', newline='\n') as _f:
+        _f.write(json.dumps({'workspace_root': os.path.join(_gap, 'ws'),
+                             'tools_dir': os.path.join(_gap, 'ws', 'tools'),
+                             'work_dir': os.path.join(_gap, 'ws', '.work'),
+                             'mach_dir': os.path.join(_gap, 'ws', '原书树', '三闸机器化')},
+                            ensure_ascii=False, indent=1))
+    env2 = dict(env, DSH_GATE_CONFIG=_cfgp, DSH_DISTILL_ROOT=os.path.join(_gap, 'ws'))
+    _b2, _ran2 = _run_all(env2, 'E-2 基准件缺失')
+    bad += _b2
+    shutil.rmtree(_gap, ignore_errors=True)
     shutil.rmtree(fx, ignore_errors=True)
-    return bad
+    return bad, _ran1, _ran2
 
 
 def _work_refs(names, tmp):
@@ -314,13 +359,18 @@ def main():
         print('     ✔ 0 处（import 闭包完整）')
 
     print('  E 异机 0 裸栈（无 DSH 数据/无 .dsh 祖先下跑包内门禁）')
-    _bad = check_foreign_no_traceback(tmp, names)
+    _bad, _e1, _e2 = check_foreign_no_traceback(tmp, names)
     if _bad:
         ok_all = False
         for _w, _why in _bad:
             print('     🔴 %-34s %s' % (_w, _why))
     else:
         print('     ✔ 0 裸栈')
+    print('     · E-1（无 DSH 环境）实跑 %d 支门禁 ｜ E-2（`DSH_GATE_CONFIG` 指向"各目录都不存在"的假配置）实跑 %d 支'
+          % (_e1, _e2))
+    if _e1 == 0 or _e2 == 0:
+        ok_all = False
+        print('     🔴 **空转**：某轮一支门禁都没跑到 ⇒ 这条判据等于没查（判据必须自证"真的跑了东西"）')
     print('  C 异环境仿真（无 .dsh 祖先 + 配置指向不存在文件）')
     src = None
     for cand in ('scripts/gates/check_layer_sync.py', 'scripts/gates/layer_quotes_gate.py'):
