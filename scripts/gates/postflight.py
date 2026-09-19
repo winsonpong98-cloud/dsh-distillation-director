@@ -625,8 +625,30 @@ def main():
         else:
             rec('manifest:插件目录≡清单(A-137)', '插件目录不存在 ⇒ 不适用', '跳过（不适用）', True, '')
 
+    # ⑮ 对外数字/版本一致性（A-135 机械化 · 2026-09-19 全面体检批挂入 · 只读）
+    #   依据：体检抓到 README 写着「门禁与工具 34 件」而**实物 36 件**（我加了随包清单与清单闸却没回头改 README），
+    #   另有"目录结构里的版本号没跟着升""版本表里**两行都标本版**"——三条同族：
+    #   **对外声明与实物不同代**。靠人记得回头改必然会漂 ⇒ 落闸（声明数 vs 实物数／版本／承诺随带件）。
+    print('\n⑮ 对外数字一致性（A-135 · 只读）')
+    _pn = os.path.join(TOOLS, 'check_public_numbers.py')
+    if not os.path.exists(_pn):
+        rec('public:数字一致性闸在位(A-135)', '闸在位', '🔴 缺 tools\\check_public_numbers.py',
+            False, 'A-135：没有这个闸 ⇒ 对外数字会随实物漂移而无人发现')
+    else:
+        _rc1, _so1, _ = run([sys.executable, _pn, '--selftest'])
+        _ok1 = ('自证通过' in _so1) and _rc1 == 0
+        rec('public:闸自证(A-135)', '3 类坏样本全拦（rc=0）',
+            ('✔ 自证通过' if _ok1 else '🔴 见输出'), _ok1,
+            'A-135：闸必须先证明能拦"件数不一致／版本不一致／承诺随带件缺失"')
+        _rc2, _so2, _ = run([sys.executable, _pn])
+        _ok2 = _rc2 == 0
+        _bad = [l.strip() for l in _so2.splitlines() if '🔴' in l][:3]
+        rec('public:声明≡实物(A-135)', '6 项逐项一致（rc=0）',
+            ('✔ 一致' if _ok2 else '🔴 ' + '｜'.join(_bad)), _ok2,
+            'A-135：README 的件数/版本/承诺随带件必须等于发行件里的实物')
+
     bad = [r for r in results if r['verdict'] == 'FAIL']
-    print('\n结论：%s' % ('✔ 改后门禁全绿（%d 项检查 · 含⑧教育线四闸＋⑨子模式自检＋⑩格式判据活性＋⑪Windows .cmd/退出码判空＋⑫写死版号巡检＋⑬波段 id 单源＋⑭随包清单双向）' % len(results) if not bad
+    print('\n结论：%s' % ('✔ 改后门禁全绿（%d 项检查 · 含⑧教育线四闸＋⑨子模式自检＋⑩格式判据活性＋⑪Windows .cmd/退出码判空＋⑫写死版号巡检＋⑬波段 id 单源＋⑭随包清单双向＋⑮对外数字一致）' % len(results) if not bad
                         else '🔴 %d 项不符，不得宣布"改完"' % len(bad)))
     for r in bad:
         print('   - %s：期望 %s ／ 实测 %s' % (r['gate'], r['expect'], r['actual']))

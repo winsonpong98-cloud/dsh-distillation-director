@@ -1,8 +1,8 @@
 {
  "name": "dsh-distillation-director",
- "version": "4.9.10",
+ "version": "4.9.11",
  "license": "AGPL-3.0-or-later",
- "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.9.10：**随包清单 ＋ 安装侧双向比对**（A-137 根治）——覆盖解包只增改不删除，「把文件移出包」在装过旧版的机器上不生效（实测 434 KB 内部手册仍留）⇒ 包内新增自动生成的成员清单 scripts/gates/_pack-manifest.txt ＋ 新闸 verify_pack_manifest.py 做双向比对（缺件／陈旧件／内容不符，含 4 类坏样本自证），挂 postflight ⑭、由 verify_plugin_pack 断言「清单 ≡ 包内成员」；并补掉 extractors 模板里最后一处真书身份、把 SKILL.md 里「估算当实测」的成本口径更正）",
+ "description": "蒸馏主管（distillation-director）：把一本书蒸馏成可执行 Agent 技能的判态制元技能（V4.9.11：**对外数字与实物同代＋全面体检批**——新增闸 check_public_numbers.py：README 的「门禁与工具 N 件」/SKILL 权威版本/版本表本版行/承诺随带件，逐项与**发行件实物**比对，含 3 类坏样本自证，挂 postflight ⑮；并修掉体检抓到的三处不同代（件数 34→36、目录结构版本号漏升、版本表两行都标\"本版\"）；同时修 check_script_sync 的权威路径（原指向已不存在的目录 ⇒ 恒报\"缺失 4 个\"假红）、把两个未发行的一次性件登记进 ONETIME 授权表、去掉 init_workspace 注释里的书名号）",
  "keywords": [
   "dsh-plugin",
   "deepseek-harness",
