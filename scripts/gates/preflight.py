@@ -17,6 +17,7 @@
 """
 import io
 import os
+import glob
 import re
 import sys
 import json
@@ -152,7 +153,7 @@ def main():
         '（② 输出见 stdout 末端）')
 
     print('\n② YAML 全库（两线，js-yaml 实解析）')
-    for tag, host, want in (('金融投资', FIN, 49), ('教育线', EDU, 23), ('债券线', BOND_DIR, 5)):  # 教育线 22→23（2026-09-13 深夜 ADHD 装机 · 计数同步）；债券线 0→5（2026-09-17 首次交付）
+    for tag, host, want in (('金融投资', FIN, 53), ('教育线', EDU, 23), ('债券线', BOND_DIR, 5)):  # 金融投资 49→53（2026-09-22 qushi-liliang 两件装机 · R8 计数同步）；教育线 22→23；债券线 0→5
         _skills = os.path.join(host, '.dsh', 'skills')
         if not os.path.isdir(_skills):
             rec('yaml:' + tag, '%d/%d' % (want, want),
@@ -168,7 +169,7 @@ def main():
             (m.group(0).replace('YAML 解析通过：', '') if m else '解析失败'), good)
 
     print('\n③ 引擎加载器实测（件数/唯名/告警/封存态）')
-    for tag, host, want in (('金融投资', FIN, 49), ('教育线', EDU, 23), ('债券线', BOND_DIR, 5)):  # 债券线 0→5（2026-09-17 首次交付）
+    for tag, host, want in (('金融投资', FIN, 53), ('教育线', EDU, 23), ('债券线', BOND_DIR, 5)):  # 金融投资 49→53（2026-09-22 qushi-liliang 两件装机）；债券线 0→5
         rc, so, se = run([NODE, os.path.join(WORK, 'skill_probe_generic.mjs'),
                           os.path.join(host, '.dsh', 'skills'), host], cwd=WORK)
         n = re.search(r'引擎发现技能数:\s*(\d+)', so)
@@ -301,6 +302,135 @@ def main():
             'PASS' if ok else '；'.join(why), ok,
             '（%s；未过不得进入下一阶段。命令：gate_start.py ／ gate_stage.py ／ gate_checklist.py --task %s）'
             % (claim_note, t))
+
+
+    # ── ⑧ 运行时闸挂载（2026-09-21 · 用户问「这三条现在是一定做了还是触发时必须做？」）──
+    #   实测教训：三件闸**通过了自证、也进了包**，但 `preflight`/`postflight` **一处都没引用**
+    #   ⇒ "触发时必须做"在执行层无法保证（要靠"我记得跑"）。本段把它们挂成**必跑**：
+    #     ① 零参数自证类：直接跑 `--selftest`，rc≠0 即红；
+    #     ② 需要任务参数类（corpus_binding_check）：**有活跃任务才跑**；
+    #        无活跃任务时**显式判"不适用"并写明理由**（不得判 PASS —— `A-144` 家族）。
+    print('\n⑧ 运行时闸挂载（三基线 ＋ 仪器充分性 · 只读）')
+    for _name, _args in (('assertion_gate.py', ['--selftest']),
+                         ('distill_acceptance_check.py', ['--selftest']),
+                         ('instrument_sufficiency.py', ['--selftest']),
+                         ('trigger_card.py', ['--selftest']),
+                         ('corpus_binding_check.py', ['--selftest']),
+                         ('orphan_gate_check.py', ['--selftest'])):
+        _p = os.path.join(TOOLS, _name)
+        if not os.path.isfile(_p):
+            rec('rt:' + _name.replace('.py', ''), '自证通过（rc=0）',
+                '🔴 文件不存在', False, '（挂载点存在但件缺失 ⇒ 发行缺口）')
+            continue
+        _rc, _so, _se = run([sys.executable, _p] + _args)
+        _last = [x for x in (_so or '').strip().split('\n') if x.strip()]
+        rec('rt:' + _name.replace('.py', ''), '自证通过（rc=0）',
+            'rc=%d' % _rc, _rc == 0, (_last[-1][:90] if _last else ''))
+
+    # corpus_binding_check：需要 --skill/--task ⇒ 有活跃任务才跑
+    _active = []
+    _pl = os.path.join(TOOLS, '_preflight_last.json')
+    _w = os.path.join(os.path.dirname(TOOLS), '.work')
+    if os.path.isdir(_w):
+        for _t in sorted(os.listdir(_w)):
+            _s = os.path.join(_w, _t, 'PIPELINE_STATE.md')
+            if os.path.isfile(_s) and (time.time() - os.path.getmtime(_s)) < 86400:
+                _active.append(_t)
+    _cb = os.path.join(TOOLS, 'corpus_binding_check.py')
+    if not os.path.isfile(_cb):
+        rec('rt:corpus_binding_check', '按任务挂（无活跃任务＝不适用）',
+            '🔴 文件不存在', False, '（发行缺口）')
+    elif not _active:
+        rec('rt:corpus_binding_check', '按任务挂（无活跃任务＝不适用）',
+            'ℹ 不适用：无活跃任务 ⇒ 本项**不判 PASS**', True,
+            '（待有任务时由 preflight 自动纳入；判据见 §27.5）')
+    else:
+        _sk = None
+        # 技能根候选：宿主工作区下的 .dsh\skills（由 gate_common 的 cfg 提供）
+        try:
+            _sk = os.path.join(os.path.dirname(os.path.dirname(ROOT)), '金融投资', '.dsh', 'skills')
+        except Exception:
+            _sk = None
+        _okcb, _det = True, []
+        for _t in _active:
+            _full = _w
+            if not _sk or not os.path.isdir(_sk):
+                _det.append('%s：技能根不可解析 ⇒ 不适用' % _t)
+                continue
+            _hit = 0
+            for _slug in sorted(os.listdir(_sk)):
+                _sd = os.path.join(_sk, _slug)
+                if not os.path.isfile(os.path.join(_sd, 'SKILL.md')):
+                    continue
+                _rc, _so, _se = run([sys.executable, _cb, '--skill', _sd, '--task', _t,
+                                     '--work', os.path.dirname(TOOLS)])
+                if _rc == 0:
+                    _hit += 1
+            if _hit == 0:
+                _okcb = False
+                _det.append('%s：**无任何技能与本册绑定成立**（疑语料错配，见 §27.5）' % _t)
+            else:
+                _det.append('%s：%d 个技能绑定成立' % (_t, _hit))
+        rec('rt:corpus_binding_check', '按任务挂（每个活跃册 ≥1 个技能绑定成立）',
+            '；'.join(_det) if _det else '无活跃任务', _okcb, '（判据：主题命中／锚同代／路径存在）')
+
+    # ── 蒸馏交付件机械闸（2026-09-22 新造 · 用户追问「技能为何不能自己完成」后落地）──
+    #   把手册 §24 E-2/E-5（标记档位/元标记分档）与 §25（守卫模板）从"纪律文字"变成"跑不通"。
+    #   判据：每个**有技能产出**的活跃册跑 check_distill_artifacts.py，要求 rc=0。
+    _cda = os.path.join(TOOLS, 'check_distill_artifacts.py')
+    if os.path.isfile(_cda):
+        _wroot = os.path.join(ROOT, '.work')
+        _tasks = []
+        for _t in sorted(os.listdir(_wroot)) if os.path.isdir(_wroot) else []:
+            if glob.glob(os.path.join(_wroot, _t, 'skills', '*', 'SKILL.md')):
+                _tasks.append(_t)
+        if not _tasks:
+            rec('artifacts:机械闸', '每个有技能产出的活跃册 rc=0', '无此类册 ⇒ 不适用', True, '（空集不假绿）')
+        else:
+            _bad = []
+            _det = []
+            for _t in _tasks:
+                _rc, _so, _se = run([sys.executable, _cda, '--task', _t])
+                if _rc == 0:
+                    _det.append(_t + ' ✔')
+                else:
+                    _bad.append(_t)
+                    _m = re.search(r'结论：(.+)', _so or '')
+                    _det.append('%s 🔴 %s' % (_t, (_m.group(1).strip()[:40] if _m else '')))
+            rec('artifacts:机械闸', '每个有技能产出的活跃册 rc=0',
+                '；'.join(_det), not _bad, '（锚形态单一来源／标记档位／守卫模板）')
+    else:
+        rec('artifacts:机械闸', '每个有技能产出的活跃册 rc=0', '🔴 检查器不存在', False, '')
+
+    # ── 册目录全覆盖（2026-09-23 新增 · 补 R4 的射程缺口）──────────────────────
+    #   为什么必须有：上面的 `artifacts:机械闸` 只跑「`.work\<t>\skills\*\SKILL.md` 存在」的册；
+    #   而 **R4 的射程是"有 `read_receipt.json` 的任务"** ⇒
+    #   「投资蒸馏\<书名>\ 里有书、但从来没建过任务目录」这一类**对两道闸都不可见**。
+    #   实测代价（本闸存在的直接原因）：**有 4 册**（书名见台账，不写进源码）**一直没有 accept7 件
+    #   而无人拦**，直到台账逐行列出才发现。
+    #   判据：`accept7-ledger.py` 的 rc ⇒ 0＝所有册目录都有 accept7 件；1＝有册目录缺件（＝待办）。
+    _led = os.path.join(TOOLS, 'accept7-ledger.py')
+    if os.path.isfile(_led):
+        _rc, _so, _se = run([sys.executable, _led])
+        _m = re.search(r'缺 accept7 件（＝待建）：\*\*(\d+)\*\*', _so or '')
+        _n = int(_m.group(1)) if _m else -1
+        _miss = [x for x in re.findall(r'册目录缺 accept7 件 \d+ 个（[^）]*）：(.+)', _so or '')]
+        rec('artifacts:册目录全覆盖', '每个册目录都有 accept7 件（rc=0）',
+            ('全部册目录均有 accept7 件（缺件 %d）' % _n) if _rc == 0 else
+            ('🔴 缺件 %d：%s' % (_n, '｜'.join(_miss)[:120])),
+            _rc == 0, '（补 R4 射程外：无任务目录的册）')
+    else:
+        rec('artifacts:册目录全覆盖', '每个册目录都有 accept7 件（rc=0）', '🔴 检查器不存在', False, '')
+
+    # 孤儿闸总数（信息性：造了却没挂的闸有多少）
+    _og = os.path.join(TOOLS, 'orphan_gate_check.py')
+    if os.path.isfile(_og):
+        _rc, _so, _se = run([sys.executable, _og, '--quiet'])
+        _m = re.search(r'孤儿闸计数：(\d+)', _so or '')
+        _n = int(_m.group(1)) if _m else -1
+        rec('rt:孤儿闸检查（信息性）', '列出"造了却没挂"的闸（不阻断）',
+            '孤儿 %s 个' % (_n if _n >= 0 else '?'), True,
+            '（本项只保证"你不可能不知道"；逐条分流见 输出\\孤儿闸报告）')
 
     bad = [r for r in results if r['verdict'] == 'FAIL']
     print('\n结论：%s' % ('✔ 开工前门禁全绿（%d 项）' % len(results) if not bad

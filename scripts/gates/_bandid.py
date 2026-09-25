@@ -61,6 +61,19 @@ ID = BAND + "-" + NUM                # 完整 id
 # 宽松档：容忍非三位序号（拆分器/规范化器等**改文件**的工具用；**不得**用作校验判据）
 ID_LOOSE = BAND + r"-\d+"
 
+# ── 页锚形排除（2026-09-23 · 实测抓到 `A-38` 家族假阳性）──────────────────────────
+# 病灶：`BAND = [A-Za-z][A-Za-z0-9]*` 把**页锚** `s206` 也当成合法波段前缀 ⇒ `ID_LOOSE`
+#   匹配 `s206-209`（那是一个**页锚区间**）⇒ 在"页面锚簇清单"这类正文里被读成条目 id，
+#   实测 `manias-crashes` 的 `crisis-stage-locator\INDEX.md` L225（「…含 s206-209、s262-263、…」）
+#   被 `rquote_page_check` 报 **ID_MISS ×3**（池内当然没有 `s206-209` 这个 id）——**假红**。
+# 判据：**页锚形＝单字母 `s`/`p`（不分大小写）＋数字**（`s206`／`p47`／`S12`）。
+#   真实波段前缀从未长这样（实测：A／C／D／G／T1／T5／E1／ST／ST1／B12…）。
+# ⚠ 只收"页锚形"这一个形态，**不得**借机收窄别的形态（收窄会造假红，`A-04`/`A-55` 家族）。
+ANCHOR_SHAPED = r"[spSP]\d+"
+BAND_STRICT = r"(?!(?:" + ANCHOR_SHAPED + r")-)[A-Za-z][A-Za-z0-9]*"
+ID_LOOSE_STRICT = BAND_STRICT + r"-\d+"
+ID_STRICT = BAND_STRICT + "-" + NUM
+
 # 条目块起点：`^### <id>` 之后必须跟空白（防 `### E1-0012` 这类更长 id 被截断误解）
 # ⚠ 空白必须是 `[ \t]+`（**一个或多个**）：官方模板的条目头是
 #   `### {band}-NNN  [类型] [技能=…]` —— id 与 `[类型]` 之间**是两个空格**；
@@ -84,7 +97,8 @@ TEMPLATE_HEAD = re.compile(r"^###\s+" + ID + r"\s+\[[A-Z]{2}\]\s+\[技能=", re.
 SPLIT = re.compile(r"(?=^###\s+" + BAND + r"-" + NUM + r"\s+\[)", re.M)
 
 # 正文里出现的 id 令牌（技能 SKILL.md 的引文页锚、附属文件等）
-ID_RE = re.compile(ID_LOOSE)
+#   ⚠ 用 **STRICT** 档（排除页锚形）—— 这里正是"页锚区间被读成 id"的病灶点（见上方说明）。
+ID_RE = re.compile(ID_LOOSE_STRICT)
 ID_EXACT_RE = re.compile(r"(?<![A-Za-z0-9])(" + ID + r")(?![0-9])")
 
 # 源文分波段文件名里的波段名：`<band>.txt` / `<band>.md`（同一语法，避免各处再写一遍）
@@ -157,6 +171,14 @@ def selftest():
     # 令牌自证
     if ids("见（`E1-001` s12／`A-007` s3）") != ["E1-001", "A-007"]:
         bad.append("ID_RE 取令牌错")
+    # 令牌自证·负样本（2026-09-23 新增）：**页锚形不得被当 id**
+    for _s in ("s206-209", "p47-48", "S12-013"):
+        if ID_RE.search(_s):
+            bad.append("ID_RE 误收页锚形：%s" % _s)
+    # 令牌自证·正样本（不得因上面的收窄而漏收真 id）
+    for _s in ("C-025", "A-025", "E1-001", "ST-001", "B12-005"):
+        if not ID_RE.match(_s):
+            bad.append("ID_RE 漏收真 id：%s" % _s)
     print("BAND=%s  NUM=%s  ID=%s" % (BAND, NUM, ID))
     print("正样本 %d／负样本 %d" % (len(POS), len(NEG)))
     if bad:

@@ -39,12 +39,10 @@ from _paths import ROOT  # noqa: E402
 ANCHOR = re.compile(r'【([^】]{0,120}?)PDF\s*(p[\d\s、,，–\-~—p]*?)】')
 BOOKS = [('Barkley', 'bark'), ('巴克利', 'bark'), ('guide', 'guide'),
          ('指南', 'guide'), ('AAP', 'guide'), ('苏林雁', 'sulin'), ('sulin', 'sulin')]
-STRIP = re.compile(r'[\s\u3000\u200b“”「」『』‘’〝〞〟"\'、。，；：！？…—－\-·．.,;:!?'
-                   r'()（）《》〈〉\[\]【】*_`~|«»‹›]')
-
-
-def norm(t):
-    return STRIP.sub('', t)
+# ── 归一化＝**单一来源**（`G-57①` · 2026-09-24）：实现整体迁入 `tools\_qnorm.py`，此处只导入。
+#    保持 `STRIP`／`norm` 两个名字在模块级可用（约 40 处 `import verify_layer_quotes as V` 的
+#    下游全走 `V.norm`／`V.STRIP`，改名即破坏面扩大）。
+from _qnorm import STRIP, norm_strip as norm  # noqa: E402,F401（G-57① 单一来源）
 
 
 def segments(q):

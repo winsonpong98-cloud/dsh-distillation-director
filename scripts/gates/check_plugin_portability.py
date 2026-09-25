@@ -163,24 +163,32 @@ def check_foreign_no_traceback(tmp, names):
 
 
 def _work_refs(names, tmp):
-    """收集包内门禁引用的 `join(WORK, 'x')` 文件名（＝必须随包的配套脚本）。"""
+    """收集包内门禁引用的 `join(WORK, 'x')` 里的**配套脚本**名（＝必须随包的件）。
+
+    ⚠ 两次收紧（都是"判据过宽 ⇒ 假红"，假红比漏检更伤：会诱导去补一个不该存在的文件）：
+      · 2026-09-19（A-132 同批）：排除 `%`/`{}` 格式化模板（`bookspec-%s.json` **不是文件名**）；
+      · **2026-09-21（异机可用批）**：本判据只会收集**脚本扩展名**（`.py/.cjs/.mjs/.js`）。
+        实测：新随包的 `ocr_pages.py` 里有 `join(WORK, 'ocr.txt')`／`'ocr_cost.json'`／
+        `'ocr_progress.txt'`／`'ocr_usage.jsonl'` —— 这四个是**运行产物名**，本就不该随包，
+        却被判成"新用户必跑不动" ⇒ 报 4 个假红。判据名是"配套**脚本**"，按数据形态分派才是对的
+        （A-07 第 7 形态）。数据文件若确需随包，请用 `# work-dep-ok:` 显式声明并把文件放进包。
+    """
     pat = re.compile(r"""join\(\s*WORK\s*,\s*['"]([^'"]+)['"]""")
     out = set()
     for n in names:
-        if n.endswith('.py'):
-            try:
-                out.update(pat.findall(io.open(os.path.join(tmp, n), encoding='utf-8').read()))
-            except Exception:
-                pass
-    # 只保留"像文件"的项（带扩展名、无通配符、不含路径分隔符）
-    # ⚠ 2026-09-19 修（A-132 同批 · 判据过宽导致**假红**）：本判据首跑报了
-    #   `🔴 bookspec-%s.json 全包内均无 —— 新用户必跑不动`，而 `bookspec-%s.json` 是
-    #   **格式化模板**（`join(WORK, 'bookspec-%s.json' % task)`），**根本不是文件名**。
-    #   假红比漏检更伤：会诱导执行者去"补一个不存在的文件"（`A-55` 家族）。
-    #   修法：排除含 `%` 的格式化模板（真正的配套脚本名里不会有 `%`）。
-    return {x for x in out if re.search(r'\.[A-Za-z0-9]+$', x) and '*' not in x
-            and '%' not in x and '{' not in x
-            and '/' not in x and '\\' not in x}
+        if not n.endswith('.py'):
+            continue
+        try:
+            lines = io.open(os.path.join(tmp, n), encoding='utf-8').read().splitlines()
+        except Exception:
+            continue
+        for ln in lines:
+            if 'work-dep-ok' in ln:          # 显式豁免（产物名／自造件，已在注释里说明）
+                continue
+            for x in pat.findall(ln):
+                if x.endswith(('.py', '.cjs', '.mjs', '.js')):
+                    out.add(x)
+    return out
 
 
 def _cross_platform_issues(names, tmp):

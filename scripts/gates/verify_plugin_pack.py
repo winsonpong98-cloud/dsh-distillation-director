@@ -109,7 +109,11 @@ def md5_or_none(p):
 
 ref = {s: md5_or_none(os.path.join(MACH, s)) for s in SCRIPTS}
 # 门禁套件：权威源在 `tools\`，包内 `scripts/gates/`（A-81）
-GATES = ['gate_start.py', 'gate_stage.py', 'gate_checklist.py', 'preflight.py', 'postflight.py', 'gate_selftest.py', 'pitfall_audit.py', 'gate_common.py', 'gate_bootstrap.py', 'check_judge_pack.py']
+GATES = ['gate_start.py', 'gate_stage.py', 'gate_checklist.py', 'preflight.py', 'postflight.py', 'gate_selftest.py', 'pitfall_audit.py', 'gate_common.py', 'gate_bootstrap.py', 'check_judge_pack.py',
+         # G-63（2026-09-24）：清单补全——以下 9 件同在包内/随包，但此前不在比对清单 ⇒ 漂移测不到
+         'distill_acceptance_check.py', 'rquote_page_check.py', 'scan_pool_counterexamples.py',
+         'verify_candidates.py', 'verify_layer_quotes.py', 'check_gate_ledger.py',
+         'writer_claim.py', 'accept7-ledger.py', '_qnorm.py']
 GATES_REF = {g: md5_or_none(os.path.join(ROOT, 'tools', g)) for g in GATES}
 ref_skill = md5_or_none(SKILL)
 _missing = ([s for s, h in ref.items() if h is None] + [g for g, h in GATES_REF.items() if h is None])

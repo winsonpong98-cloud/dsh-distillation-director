@@ -23,7 +23,24 @@ except Exception:
 
 PIPE = re.compile(r'(?<!\\)\|')
 
-for path in sys.argv[1:]:
+# ⚠ 2026-09-21（异机装完即用批）：本件随包发行，用户在别人电脑上第一句多半是
+#   `python check_md_tables.py --help` 或干脆不带参数 ⇒ 旧版会 `io.open('--help')` 抛裸栈
+#   （异机仿真实测抓到）。现：`-h/--help` 打用法、无参打用法、文件不存在**跳过并说明**，都不发裸栈。
+ARGS = [x for x in sys.argv[1:] if not x.startswith('-')]
+USAGE = ('用法：python check_md_tables.py <md 文件> [更多 md 文件...]\n'
+         '  作用：逐块检查 markdown 表格的管道数是否一致（块内不一致即报出起始行号）。\n'
+         '  说明：只数**未转义**的 `|`（`\\|` 是正确转义，不算破损）。')
+if ('-h' in sys.argv) or ('--help' in sys.argv):
+    print(USAGE)
+    sys.exit(0)
+if not ARGS:
+    print(USAGE)
+    sys.exit(2)
+
+for path in ARGS:
+    if not os.path.isfile(path):
+        print('  ⚠ 跳过（文件不存在）：%s' % path)
+        continue
     lines = io.open(path, encoding='utf-8').read().splitlines()
     bad, tables = [], 0
     i = 0

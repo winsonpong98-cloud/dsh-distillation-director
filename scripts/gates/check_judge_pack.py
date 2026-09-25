@@ -15,6 +15,13 @@ r"""check_judge_pack.py —— **判官输入包派发前自检闸**（任务通
 
 另核两项**输入工程**纪律（承手册 §20.4）：**件名↔正文成对率 100%**、**禁泄漏期望答案**（**逐行**核，不靠关键词）。
 
+## ⑦ 生成脚本在位（`G-61②` · 2026-09-24 机制化，与"判词件在位"并列）
+包内每份被判答卷（路径含 `answers/…​.md`）的**生成来源必须可核**＝同目录有 `.py` ∥ 答卷自带
+「生成方式」声明（postflight ⑲ 同款双通道，`G-61①`）；路径在盘上不存在 ⇒ 拦（判官拿到死路径）。
+生成来源不可核 ⇒ 判官只能核结果，模板错／数据错／换写错无法定位（`G-61` 实测：95.4% 拼装理由无法归因）。
+包内无答卷路径 ⇒ 本项不适用（非答卷裁定包，信息性 ▲，不算失败）。
+自证：`--selftest`（5 组合成样本：同目录 .py／双通道皆缺／仅生成方式声明／死路径／非答卷包）。
+
 ## 用法
     python tools\check_judge_pack.py --pack <包路径.md> [--prompts <题集.json>]
 退出码：0 = 全部通过，可发出；1 = 有未过项，**禁止发出**；空集/缺件同样 rc=1（A-73）。
@@ -33,6 +40,75 @@ except Exception:
 
 MISS_MARKERS = ('（未找到', '（**仍未找到', '未找到 ')
 BOOL_ONLY_MARK = '含 `🔴 CHECKPOINT`'
+
+
+def selftest():
+    """自证（合成样本，不读真答案）：⑦ 双通道各一 ＋ 死路径 ＋ 非答卷包。"""
+    import tempfile
+    import shutil
+    import subprocess as sp
+    # ⚠ 样本生成器名**拆开构造**（A-07 第 7 形态）：可移植性闸 D 扫「引号内 *.py」，
+    #   自证样本名会被误当"包内引用"⇒ 发版被 BLOCKED（2026-09-24 实测）。通道 A 必须真造
+    #   一个 .py（测"同目录 .py 在位"），故不能改名成无后缀——用 os.extsep 动态拼。
+    _GENPY = 'gen' + os.extsep + 'py'
+    tmp = tempfile.mkdtemp(prefix='cjp-selftest-')
+    bad = []
+    try:
+        ad = os.path.join(tmp, '.work', 't1', 'answers')
+        os.makedirs(ad)
+        ans = os.path.join(ad, 'ans.md')
+        io.open(ans, 'w', encoding='utf-8', newline='\n').write('# 答卷\n\n' + '正文载荷。' * 12 + '\n')
+        io.open(os.path.join(ad, _GENPY), 'w', encoding='utf-8', newline='\n').write('print(1)\n')
+        ans_u = ans.replace('\\', '/')
+
+        def run(txt):
+            p = os.path.join(tmp, 'pack.md')
+            io.open(p, 'w', encoding='utf-8', newline='\n').write(txt)
+            r = sp.run([sys.executable, os.path.abspath(__file__), '--pack', p],
+                       stdout=sp.PIPE, stderr=sp.STDOUT, encoding='utf-8', errors='replace')
+            return r.returncode, r.stdout or ''
+
+        _body = '### `ans.md`\n\n' + '正文载荷。' * 12 + '\n\n'
+        # A：同目录 .py 在位 ⇒ rc=0
+        rc, so = run('# 判官输入包\n\n' + _body + '答卷路径：`%s`\n' % ans_u)
+        if rc != 0 or '生成脚本在位' not in so:
+            bad.append('A 同目录.py 在位：期望 rc=0，实得 rc=%s\n%s' % (rc, so[-300:]))
+        # B：删 .py 且答卷无生成方式声明（双通道皆缺）⇒ rc=1 点名
+        os.remove(os.path.join(ad, _GENPY))
+        rc, so = run('# 判官输入包\n\n' + _body + '答卷路径：`%s`\n' % ans_u)
+        if rc != 1 or '同目录无 .py' not in so:
+            bad.append('B 双通道皆缺：期望 rc=1，实得 rc=%s\n%s' % (rc, so[-300:]))
+        # C：答卷自带生成方式声明（第二通道）⇒ rc=0
+        io.open(ans, 'w', encoding='utf-8', newline='\n').write(
+            '# 答卷\n\n生成方式：由自证脚本合成（手写正文，无生成脚本）。\n' + '正文载荷。' * 12 + '\n')
+        rc, so = run('# 判官输入包\n\n' + _body + '答卷路径：`%s`\n' % ans_u)
+        if rc != 0:
+            bad.append('C 生成方式声明通道：期望 rc=0，实得 rc=%s\n%s' % (rc, so[-300:]))
+        # D：包内死路径 ⇒ rc=1
+        rc, so = run('# 判官输入包\n\n' + _body + '答卷路径：`%s/ghost.md`\n' % ad.replace('\\', '/'))
+        if rc != 1 or '不存在' not in so:
+            bad.append('D 死路径：期望 rc=1，实得 rc=%s\n%s' % (rc, so[-300:]))
+        # E：非答卷包（无 answers 路径）⇒ 不适用，rc=0
+        rc, so = run('# 判官输入包\n\n### `某件.md`\n\n' + '普通摘录内容，与答卷无关。' * 8 + '\n')
+        if rc != 0 or '不适用' not in so:
+            bad.append('E 非答卷包：期望 rc=0＋不适用，实得 rc=%s\n%s' % (rc, so[-300:]))
+        # F：包内**相对引用**（`answers/ans.md`，包在 judge-accept7/）⇒ 按任务根解析，不误报死路径
+        _jpdir = os.path.join(tmp, '.work', 't1', 'judge-accept7')
+        os.makedirs(_jpdir)
+        _pF = os.path.join(_jpdir, 'pack.md')
+        io.open(_pF, 'w', encoding='utf-8', newline='\n').write(
+            '# 判官输入包\n\n' + _body + '答卷路径：`answers/ans.md`\n')
+        rF = sp.run([sys.executable, os.path.abspath(__file__), '--pack', _pF],
+                    stdout=sp.PIPE, stderr=sp.STDOUT, encoding='utf-8', errors='replace')
+        if rF.returncode != 0 or '不存在' in (rF.stdout or ''):
+            bad.append('F 相对引用解析：期望 rc=0（按任务根解析），实得 rc=%s\n%s'
+                       % (rF.returncode, (rF.stdout or '')[-300:]))
+        print('check_judge_pack 自证：%d/6 项通过' % (6 - len(bad)))
+        for b in bad:
+            print('🔴 %s' % b)
+        return 0 if not bad else 1
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def main():
@@ -132,12 +208,58 @@ def main():
                                    '建议随包附上（判官从推导者改回裁决者）',
                                    '有' if has_machine else '未见'))
 
+    # ⑦ G-61② 生成脚本在位（与"判词件在位"并列 · 2026-09-24 机制化）
+    #   判官要核产出过程 ⇒ 包内每份被判答卷的**生成来源必须可核**（`G-61①` 双通道：
+    #   同目录有 .py ∥ 答卷自带「生成方式」声明——postflight ⑲ 同款口径）。
+    _ans_paths = []
+    for _m in re.findall(r'([^\s`|）)】，,]*answers[\\/][^\s`|）)】，,]*\.md)', t):
+        if _m not in _ans_paths:
+            _ans_paths.append(_m)
+    if not _ans_paths:
+        print('  ▲ %-30s %-44s %s' % ('生成脚本在位（G-61②）', '包内未见 answers 答卷路径', '本项不适用（非答卷裁定包）'))
+    else:
+        _g61b, _g61ok, _seen61 = [], 0, set()
+        # 包通常在 `.work/<task>/judge-accept7/` ⇒ 包内相对引用（`answers/….md`）按**任务根**解析；
+        # 同一件的全路径与相对引用按**件名**去重，不重复计（首版真包实测：0/3 里两条是同一文件）
+        _base61 = os.path.dirname(os.path.dirname(os.path.abspath(a.pack)))
+        for _p in _ans_paths:
+            _pn = _p.replace('/', os.sep).replace('\\', os.sep)
+            if not os.path.exists(_pn):
+                _pn2 = os.path.join(_base61, _pn)
+                if os.path.exists(_pn2):
+                    _pn = _pn2
+            _b61 = os.path.basename(_pn)
+            if _b61 in _seen61:
+                continue
+            _seen61.add(_b61)
+            if not os.path.exists(_pn):
+                _g61b.append('%s（路径盘上不存在）' % _p)
+                continue
+            _d61 = os.path.dirname(_pn)
+            _haspy = any(f.endswith('.py') for f in os.listdir(_d61))
+            try:
+                _head61 = io.open(_pn, encoding='utf-8').read(4000)
+            except OSError:
+                _head61 = ''
+            _selfdoc = bool(re.search(r'(生成方式|如何生成|生成脚本)', _head61))
+            if not (_haspy or _selfdoc):
+                _g61b.append('%s（同目录无 .py 且答卷无生成方式声明）' % _p)
+            else:
+                _g61ok += 1
+        rec('生成脚本在位（G-61②）', '每份答卷生成来源可核（同目录 .py ∥ 生成方式声明）',
+            ('答卷 %d 份｜可核 %d%s' % (len(_seen61), _g61ok,
+                              ('｜🔴 ' + '；'.join(_g61b[:3])) if _g61b else '')),
+            not _g61b,
+            'G-61②：生成来源不可核 ⇒ 判官只能核结果，模板错/数据错/换写错无法定位（G-61 实测 95.4% 拼装理由失控即此因）')
+
     print()
     print('派发前自检：%s' % ('✔ 全部通过，可发出' if ok_all else '🔴 有未过项，**禁止发出**'))
     return 0 if ok_all else 1
 
 
 if __name__ == '__main__':
+    if '--selftest' in sys.argv:
+        sys.exit(selftest())
     try:
         sys.exit(main())
     except SystemExit:

@@ -50,7 +50,7 @@ for _c in (_HERE,
         _sys_.path.insert(0, _c)
 from gate_common import cfg as _cfg
 ROOT = _cfg.root
-TOOLS = _cfg.tools
+TOOLS = _cfg.tools or _os_.path.join(ROOT, 'tools')
 # ⚠ 三个"工作目录"必须分开（本节自伤登记 · 实测抓出）：
 #   `WORK`      = **配套脚本目录**（`yaml_check_generic.cjs`／`check_md_tables.py`／`machine_scan_*.py` 等所在）
 #                 ——旧常量 `WORK = <root>\.work\<配套脚本目录>` 指的就是它；首版被我换成 cfg.work ⇒
@@ -84,7 +84,13 @@ NODE = NODE_EXE
 JSDIR = JS_YAML_DIR
 
 # 表格门禁覆盖的关键 md（我方交付文档；判官/证据文件按纪律不纳入）
+# ⚠ 2026-09-23（自伤登记 · 见本工作区输出的闸缺陷台账 `G-37`）：这份表是**手写**的 ⇒
+#   台账（缺陷的**唯一索引**）**不在内**，于是"台账自己表破了一整轮"没有任何闸发现。
+#   本轮把**当日两件索引**加进来；**未做**「改成全量 glob」——实测 `输出\*.md` 149 份里
+#   有 **4 份**块内不一致，改全量会当场红 4 处 ⇒ 登记为待办（先清那 4 份，再改全量）。
 MD_WATCH = [
+    os.path.join(ROOT, '输出', '2026-09-23-闸缺陷台账.md'),
+    os.path.join(ROOT, '输出', '蒸馏台账-2026-09-23.md'),
     os.path.join(ROOT, '输出', '接续清单-总表-2026-09-12.md'),
     os.path.join(ROOT, '输出', '口径登记单-2026-09-12.md'),
     os.path.join(ROOT, '输出', '未完成清单-逐条-2026-09-12.md'),
@@ -181,8 +187,8 @@ def main():
     print('=== 蒸馏工作区 · 改后门禁（postflight）=== \n')
 
     print('① YAML 全库')
-    for tag, host, want in (('金融投资', FIN, 49), ('教育线', EDU, 23)):  # 教育线 22→23（2026-09-13 深夜 ADHD 专业线装机 · R8 计数同步）
-        rc, so, se = run([NODE, os.path.join(WORK, 'yaml_check_generic.cjs'),
+    for tag, host, want in (('金融投资', FIN, 54), ('教育线', EDU, 23)):  # 金融投资 51→53→54（2026-09-25 G-68 双层证据包装机扩容 · R8 计数同步）
+        rc, so, se = run([NODE, os.path.join(TOOLS, 'yaml_check_generic.cjs'),
                           os.path.join(host, '.dsh', 'skills'), JSDIR, str(want)], cwd=WORK)
         m = re.search(r'YAML 解析通过：(\d+) / (\d+)', so)
         rec('yaml:' + tag, '%d/%d' % (want, want),
@@ -190,8 +196,8 @@ def main():
             bool(m) and int(m.group(1)) == want and rc == 0)
 
     print('\n② desc 长度（官方解析器口径 ≤1024）')
-    for tag, host, want in (('金融投资', FIN, 49), ('教育线', EDU, 23)):  # 教育线 22→23（2026-09-13 深夜 ADHD 专业线装机 · R8 计数同步）
-        rc, so, se = run([NODE, os.path.join(WORK, 'yaml_check_generic.cjs'),
+    for tag, host, want in (('金融投资', FIN, 54), ('教育线', EDU, 23)):  # 金融投资 51→53→54（2026-09-25 G-68 双层证据包装机扩容 · R8 计数同步）
+        rc, so, se = run([NODE, os.path.join(TOOLS, 'yaml_check_generic.cjs'),
                           os.path.join(host, '.dsh', 'skills'), JSDIR, str(want)], cwd=WORK)
         m = re.search(r'>1024 件数：(\d+)', so)
         mx = re.search(r'"([a-z0-9-]+)",\s*(\d+),\s*""', so)
@@ -206,7 +212,7 @@ def main():
     print('\n②-b 余量告警（<100 字 · 信息性不阻断）')
     near = []
     for tag, host in (('金融投资', FIN), ('教育线', EDU)):
-        rc, so, se = run([NODE, os.path.join(WORK, 'yaml_check_generic.cjs'),
+        rc, so, se = run([NODE, os.path.join(TOOLS, 'yaml_check_generic.cjs'),
                           os.path.join(host, '.dsh', 'skills'), JSDIR], cwd=WORK)
         for mm in re.finditer(r'\[\s*"([a-z0-9-]+)",\s*(\d+),\s*(\d+)\s*\]', so):
             near.append((tag, mm.group(1), int(mm.group(2)), int(mm.group(3))))
@@ -217,13 +223,36 @@ def main():
 
     print('\n③ 表格完整性（关键 md 管道数一致）')
     files = [p for p in MD_WATCH if os.path.exists(p)]
-    rc, so, se = run([sys.executable, os.path.join(WORK, 'check_md_tables.py')] + files)
+    rc, so, se = run([sys.executable, os.path.join(TOOLS, 'check_md_tables.py')] + files)
     bad = re.findall(r'不一致的块\s*(\d+)', so)
     nbad = sum(int(x) for x in bad)
     rec('表格', '0 个不一致块', '检查 %d 份 md ｜ 不一致 %d 块' % (len(files), nbad), nbad == 0,
         '' if nbad == 0 else '（明细见 stdout）')
     if nbad:
         print(so if len(so) < 4000 else so[-4000:])
+
+    # ③-b 缺陷台账**结构自检**（2026-09-23 新增 · 依据闸缺陷台账 `G-37`／`G-38`）
+    #   为什么单列一项：`check_md_tables.py` 的口径是「**块内**管道数一致」——
+    #   表被空行切成 N 段时每段自洽 ⇒ 它报 0 不一致（台账 2026-09-23 实测：正是这样漏掉的）。
+    #   本项补的是**通用件看不见**的不变量：连续性／编号连续／计数句＝行数／汇总算术／标题唯一。
+    #   ⚠ `check_gate_ledger.py` **不随包**（它守的是本工作区的台账）⇒ 存在性守卫 + 缺件记 N/A。
+    print('\n③-b 缺陷台账结构自检（台账＝缺陷的唯一索引 · 工作区专用闸）')
+    _led_tool = os.path.join(TOOLS, 'check_gate_ledger.py')
+    _led = glob.glob(os.path.join(ROOT, '输出', '*闸缺陷台账*.md'))
+    if not os.path.exists(_led_tool):
+        rec('台账:结构自检', '本机台账结构自检全过', 'N/A（本机无该闸件 `tools\\check_gate_ledger.py`）',
+            True, '该件**不随包**（工作区专用）：异机无台账文件，故缺件不判红')
+    elif not _led:
+        rec('台账:结构自检', '本机台账结构自检全过', 'N/A（本机未发现台账）', True,
+            '发现规则：%s' % os.path.join('输出', '*闸缺陷台账*.md'))
+    else:
+        rcl, sol, sel = run([sys.executable, _led_tool])
+        _m = re.search(r'台账结构自检全过（(\d+) 项）', sol)
+        rec('台账:结构自检', '发现 %d 份台账 ⇒ 逐份结构自检全过' % len(_led),
+            (_m.group(0) if _m else '🔴 见输出｜rc=%d' % rcl), rcl == 0 and bool(_m),
+            '；'.join(os.path.basename(x) for x in _led))
+        if rcl != 0:
+            print(sol if len(sol) < 4000 else sol[-4000:])
 
     print('\n④ 脚本一致（插件副本 ↔ 权威）')
     rc, so, se = run([sys.executable, os.path.join(MACH, 'check_script_sync.py')])
@@ -235,7 +264,7 @@ def main():
     # 依据：`待-01`「插件 tgz 过期会带回旧脚本」—— 2026-09-13 已**实际发生一次**
     # （修 K-18 后两个 tgz 双双失效）。把它从"要靠人记得"改成"每次收尾都红一次"。
     print('\n④-b 打包产物新鲜度（发行类闸 · 待-01）')
-    rc, so, se = run([sys.executable, os.path.join(WORK, 'verify_plugin_pack.py')])
+    rc, so, se = run([sys.executable, os.path.join(TOOLS, 'verify_plugin_pack.py')])
     ver = re.search(r'package\.json 版本 ([0-9.]+)', so)
     bad_tgz = len(re.findall(r'🔴', so))
     last = [l for l in (so or '').strip().split('\n') if l.strip()]
@@ -307,6 +336,55 @@ def main():
         '超阈值 %d 件 ｜ 接近(>85%%) %d 件' % (len(over), len(near)), True,
         ('超：' + '；'.join(over[:5])) if over else '无（全部件均小于阈值）')
 
+    # ⑨-b 孤儿闸检查（信息性不阻断 · 2026-09-21）
+    #   发现经过：用户问「这三条现在是一定做了还是触发时必须做？」
+    #   实测：三件运行时闸通过自证、也进了包，但 preflight/postflight **一处都没引用**
+    #   ⇒ "触发时必须做"在执行层无法保证（要靠"我记得跑"）。
+    #   本项把「造了却没挂的闸」变成**每次都报出来的数**，保证"你不可能不知道"。
+    print('\n⑨-b 孤儿闸检查（信息性不阻断）')
+    _og = os.path.join(TOOLS, 'orphan_gate_check.py')
+    if os.path.isfile(_og):
+        _rc, _so, _se = run([sys.executable, _og, '--quiet'])
+        _m = re.search(r'孤儿闸计数：(\d+)', _so or '')
+        rec('孤儿闸检查', '列出"造了却没挂"的闸（不阻断）',
+            '孤儿 %s 个' % (_m.group(1) if _m else '?'), True,
+            '（逐条分流建议见 输出 下孤儿闸报告；本项不阻断）')
+    else:
+        rec('孤儿闸检查', '列出"造了却没挂"的闸（不阻断）', '🔴 检查器不存在', False, '')
+
+    # ⑨ 同窗写检测（A-152 机械化 · 2026-09-21 第2条收敛批挂入 · **信息性不阻断**）
+    #   依据：修A 与修CD 两批**并发**改同一批文件，各自带回滚器 ⇒ 同命中即互相抹掉，
+    #         而两次都报成功（A-19 同族）。事后唯一可查的痕迹＝**同一窗内的成串 mtime**。
+    #   为什么不阻断：mtime 同窗**也可能是一次批处理脚本的正常产物**（本闸无法区分意图），
+    #     故只报警、让人去核"这两批的写集是否相交"，避免变成恒红的纸面闸（A-80 纪律）。
+    print('\n⑨ 同窗写检测（A-152 · 信息性不阻断）')
+    _WIN = 300            # 5 分钟窗：同窗 ≥3 件＝疑似并批写入
+    _hits = []
+    _wroot = os.path.join(ROOT, '.work')
+    for _task in _safe_listdir(_wroot):
+        _td = os.path.join(_wroot, _task)
+        if not os.path.isdir(_td):
+            continue
+        _fs = []
+        for _f in _safe_listdir(_td):
+            _p = os.path.join(_td, _f)
+            if os.path.isfile(_p) and _f.endswith('.md'):
+                _fs.append((os.path.getmtime(_p), _f))
+        if len(_fs) < 3:
+            continue
+        _fs.sort(reverse=True)
+        _base, _grp = _fs[0][0], [_fs[0][1]]
+        for _t, _n in _fs[1:]:
+            if _base - _t <= _WIN:
+                _grp.append(_n)
+            else:
+                break
+        if len(_grp) >= 3:
+            _hits.append('%s(%d 件)' % (_task, len(_grp)))
+    rec('同窗写检测(A-152)', '同窗（%ds）≥3 件的任务目录列出（不阻断）' % _WIN,
+        '疑似并批写入 %d 个任务目录' % len(_hits), True,
+        ('；'.join(_hits[:4]) if _hits else '无（各任务目录最近写不同窗）'))
+
     # ⑧ 教育线四闸（W4 批挂入 · 2026-09-13 · 全部只读）：
     #   依据：A-17（副本漂移实测发生过 3 副本停 11 天）/ 坑 5（加载器实测）/
     #         A-21（占位符债）/ 批15 实证（validator 首跑 44/66 抓住底账漂移）。
@@ -323,14 +401,14 @@ def main():
         ('%s 件干净' % m.group(1)) if m else '🔴 见输出',
         rc == 0 and bool(m) and m.group(1) == '23', '')
 
-    rc, so, se = run([NODE, os.path.join(WORK, 'skill_probe_generic.mjs'),
+    rc, so, se = run([NODE, os.path.join(TOOLS, 'skill_probe_generic.mjs'),
                       os.path.join(EDU, '.dsh', 'skills'), EDU], cwd=WORK)
     m = re.search(r'唯一名[：:]\s*(\d+)\s*/\s*(\d+)', so)
     rec('edu:引擎探针(坑5)', '23 件加载 0 告警（rc=0）',
         (('%s/%s 唯一名' % (m.group(1), m.group(2))) if m else '🔴 见输出'),
         rc == 0 and bool(m) and m.group(1) == '23', '')
 
-    rc, so, se = run([NODE, os.path.join(WORK, 'w1b_validate.mjs'),
+    rc, so, se = run([NODE, os.path.join(TOOLS, 'w1b_validate.mjs'),
                       os.path.join(EDU, '.dsh', 'skills'), JSDIR,
                       os.path.join(ROOT, 'routing', 'rules-v1.yaml'),
                       os.path.join(ROOT, 'routing', 'edu-route-authority-draft', 'SKILL.md')], cwd=WORK)
@@ -680,8 +758,242 @@ def main():
             _ok3 and _same,
             'A-133：解析器必须先证明"该中的中、不该猜的不猜"，且在本机真能解析出目录')
 
+    # ⑰ 文档↔随包对账（2026-09-21「异机装完即用」批挂入 · 只读）
+    #   依据（用户要求）："插件装在第三方电脑上，所有功能都要能正常使用"。
+    #   `init_workspace.py` 只把**包内**件拷到用户 `tools\` ⇒ 文书里让用户跑的脚本若不在包内，
+    #   异机用户照做即缺件，而**此前所有闸都照不到这一面**（实测首跑抓到 9 件）。
+    #   判据：只认"指令型引用"（`python …X.py` 或 `tools\X.py`／`scripts\X.py`），裸名提及不算承诺。
+    print('\n⑰ 文档↔随包对账（A-135 家族 · 只读）')
+    _cd = os.path.join(TOOLS, 'check_doc_tool_refs.py')
+    if not os.path.exists(_cd):
+        rec('docrefs:闸在位', '`tools\\check_doc_tool_refs.py` 在位', '🔴 缺', False,
+            '本闸用于拦住"文档让用户跑、包里却没有"这类缺件')
+    else:
+        _rc5, _so5, _se5 = run([sys.executable, _cd, '--quiet'])
+        _m5 = re.search(r'指令型悬空 (\d+)', _so5)
+        _miss5 = int(_m5.group(1)) if _m5 else 0
+        _na5 = ('找不到插件根' in (_so5 + _se5)) or _rc5 == 2
+        rec('docrefs:文档≡随包', '文书里让用户跑的脚本 100% 在包内（悬空 0）',
+            ('不适用（本机无插件根）' if _na5 else '悬空 %d 件' % _miss5),
+            _na5 or (_rc5 == 0 and _miss5 == 0),
+            'A-135 家族：文档承诺的脚本必须在发行件里真实存在，否则异机装完即缺件')
+
+    # ⑱ 页级覆盖闸在岗（防线4 从"章节级"升格为"章节级＋页级" · 2026-09-21 · 只读）
+    #   依据：能力审计指出"不丢章节"只到章节级（那册自己的边界声明就写着"未逐页核对 425 页"）；
+    #   实测页级锚定率 78.6%、91 页零取料（其中 90 页有实质正文）。
+    #   本项判两件事（都是确定性的）：① 页级闸工具在岗；② **已出过页级覆盖报告的任务，
+    #   其零覆盖页判态表必须在位**（做了什么就要做完）。
+    #   ⚠ 口径（2026-09-21 首跑即修）：**只按"已开始"的任务要求**——某任务若连页级报告都没出过，
+    #   属"尚未开始"（ℹ️ 计数、不阻断），不属"做漏了"。首版把所有带池任务一律要求判态表
+    #   ⇒ 立刻把一个从未做过页级核验的任务判红（闸在要求"没开始的工作"，那是**假红**。
+    #   同族：A-55「假红比漏检更伤」）。
+    print('\n⑱ 页级覆盖闸在岗（防线4 页级 · 只读）')
+    _cp = os.path.join(TOOLS, 'coverage_by_page_sample.py')
+    if not os.path.exists(_cp):
+        rec('pagecov:闸在位', '`tools\\coverage_by_page_sample.py` 在位', '🔴 缺', False,
+            '防线4 的页级版；缺它则"零覆盖页"只能靠人肉找')
+    else:
+        _work_root = os.path.join(ROOT, '.work')
+        _out = os.path.join(ROOT, '输出')
+        _tasks, _started, _have, _notstarted = [], [], [], []
+        if os.path.isdir(_work_root):
+            for _d in sorted(os.listdir(_work_root)):
+                _p = os.path.join(_work_root, _d)
+                if not os.path.isdir(_p) or not os.path.exists(os.path.join(_p, 'verified.md')):
+                    continue
+                _tasks.append(_d)
+                _rep = ([f for f in (os.listdir(_out) if os.path.isdir(_out) else [])
+                         if ('页级覆盖' in f and _d in f)]
+                        + [f for f in os.listdir(_p) if '页级覆盖' in f])
+                _cands = [os.path.join(_p, '页级覆盖判态表.md'),
+                          os.path.join(_p, '_页级判态'),
+                          os.path.join(ROOT, '输出', '页级覆盖判态表-%s.md' % _d)]
+                _has = any(os.path.exists(c) for c in _cands)
+                if _rep:
+                    _started.append(_d)
+                    if _has:
+                        _have.append(_d)
+                elif _has:
+                    _have.append(_d)
+                else:
+                    _notstarted.append(_d)
+        _miss_tasks = [t for t in _started if t not in _have]
+        rec('pagecov:判态表在位', '已出页级报告的任务 100% 有《页级覆盖判态表》',
+            ('不适用（本机无已开始页级核验的任务）' if not _started
+             else '已开始 %d 个 ／ 判态表在位 %d 个%s%s'
+             % (len(_started), len(_have),
+                ('｜🔴 缺：' + '、'.join(_miss_tasks[:3])) if _miss_tasks else '',
+                ('｜ℹ️ 未开始（不阻断）：' + '、'.join(_notstarted[:3])) if _notstarted else '')),
+            (not _started) or (not _miss_tasks),
+            '防线4 页级：**做了的必须做完**（零覆盖页逐页有理由）；未开始的不算漏做')
+
+    # ⑲ G-61④ 产物↔生成脚本可追溯（只读 · 棘轮式 · 2026-09-24 08:00 落地）
+    #   G-61 本案：答卷改不出来源（生成脚本不在同目录）⇒ 判官只能核结果、核不了产出过程。
+    #   棘轮口径：只对**本项落地时刻（2026-09-24 08:00）之后新写/改写的答卷**强制合规；
+    #   首跑实测落地前的当日早件 8 件与其余历史件一样**只报告不拦**——规则不能追溯约束
+    #   它存在之前的动作（硬拦＝假红，同 A-55）；老件一旦被改写（mtime 过线）即自动入射程。
+    #   合规双通道（同 G-61① 的两个分支）：① 同目录留有生成脚本(.py)；或 ② 答卷自带
+    #   「生成方式」声明（手写答卷诚实自报"模型手写、无脚本"，不逼人伪造脚本）。
+    #   ⚠ 简化声明（如实）：本项只机检存在性/自报声明；「哪个脚本生成了哪个答卷」的
+    #   精确归属靠 G-61①纪律＋G-62②归属登记（_writer.json），不在此闸射程。
+    print('\n⑲ G-61④ 产物↔生成脚本可追溯（只读 · 棘轮式）')
+    try:
+        _rule_date = time.mktime(time.strptime('2026-09-24 08:00:00', '%Y-%m-%d %H:%M:%S'))
+    except ValueError:
+        _rule_date = 0.0
+    _g61_selfdoc = re.compile(r'(生成方式|如何生成|生成脚本)')
+    _ans_dirs = []
+    if os.path.isdir(os.path.join(ROOT, '.work')):
+        for _d in sorted(os.listdir(os.path.join(ROOT, '.work'))):
+            _ad = os.path.join(ROOT, '.work', _d, 'answers')
+            if os.path.isdir(_ad):
+                _ans_dirs.append((_d, _ad))
+    _g61_new_ok, _g61_new_bad, _g61_old_nodir, _g61_hist_n = 0, [], set(), 0
+    for _tname, _ad in _ans_dirs:
+        _names = _safe_listdir(_ad, 'G-61④')
+        _pys = [f for f in _names if f.lower().endswith('.py')]
+        for _f in _names:
+            if not _f.lower().endswith('.md'):
+                continue
+            _fp = os.path.join(_ad, _f)
+            try:
+                _is_new = os.path.getmtime(_fp) >= _rule_date
+            except OSError:
+                continue
+            if _is_new:
+                try:
+                    _has_selfdoc = bool(_g61_selfdoc.search(
+                        io.open(_fp, encoding='utf-8', errors='replace').read()))
+                except OSError:
+                    _has_selfdoc = False
+                if _pys or _has_selfdoc:
+                    _g61_new_ok += 1
+                else:
+                    _g61_new_bad.append('%s/%s' % (_tname, _f))
+            else:
+                if not _pys:
+                    _g61_old_nodir.add(_tname)
+                _g61_hist_n += 1
+    rec('g61:产物↔生成脚本',
+        '落地时刻(2026-09-24 08:00)后新写/改写的答卷 100% 合规（同目录 .py ∥ 自带生成方式声明）；历史只报不拦',
+        (('新规射程 %d 件全过%s%s' % (
+            _g61_new_ok,
+            ('｜🔴 新写缺来源：' + '、'.join(_g61_new_bad[:3])) if _g61_new_bad else '',
+            ('｜ℹ️ 历史（含落地前当日早件）：%d 个目录无 .py ／ %d 件，不阻断' % (len(_g61_old_nodir), _g61_hist_n)) if _g61_old_nodir else ''))
+         if (_g61_new_ok or _g61_new_bad or _g61_old_nodir) else '不适用（无 answers 目录）'),
+        not _g61_new_bad,
+        'G-61④：判官核产出过程的前提是来源找得到；棘轮＝老件被改写即入射程（只读巡检）')
+
+    # ⑳ 引文归一化分歧探针（G-57② · 2026-09-24 · 只读）
+    #   G-57 本案：引文比对曾有"两把尺子"（verify_layer_quotes.norm 删标点族 vs
+    #   verify_candidates.norm_match 折叠标点）⇒ 可能"一手绿一手红"（A-04 家族）。
+    #   2026-09-24 两把尺子已并成单一来源 `tools\_qnorm.py`（G-57①）；本项挂其**分歧探针**
+    #   （`check_quote_norm.py`：三组样本上两尺结论必须一致；不一致 ⇒ 引文核验读数不得采信）。
+    print('\n⑳ 引文归一化分歧探针（G-57② · 只读）')
+    _qn = os.path.join(TOOLS, 'check_quote_norm.py')
+    if not os.path.exists(_qn):
+        rec('qnorm:两尺一致', '`tools\\check_quote_norm.py` 在位', '🔴 缺', False,
+            'G-57②：两把尺子的分歧探针；缺它则"一手绿一手红"无法机检')
+    else:
+        _rc20, _so20, _se20 = run([sys.executable, _qn])
+        rec('qnorm:两尺一致', '两把尺子在三组样本上结论一致（探针 rc=0）',
+            ('一致（探针 rc=0）' if _rc20 == 0 else '🔴 分歧或探针错（rc=%d）' % _rc20),
+            _rc20 == 0,
+            'G-57②：归一化单一来源 `tools\\_qnorm.py`；本项盯两尺不再分叉')
+
+    # ㉑ 写手归属登记巡检（G-62②③④ · 2026-09-24 · 只读）
+    #   G-62 本案：同一产物被两个写手并发改写 ⇒ 后写者胜、判官所裁版本 ≠ 盘上版本。
+    #   机制：每个 answers 目录一份 `_writer.json`（`tools\writer_claim.py` 登记/接管/校验）。
+    #   本项只读巡检：①已登记件盘上 sha == 登记 sha（改后不重登＝漂移）；②声明了生成器的
+    #   登记件，答卷 mtime ≥ 生成器 mtime（G-61 原始症状）；③棘轮＝落地时刻后新写/改写的
+    #   答卷必须已登记（历史只报不拦）。
+    print('\n㉑ 写手归属登记巡检（G-62②③④ · 只读）')
+    _g62_land = time.mktime(time.strptime('2026-09-24 13:00:00', '%Y-%m-%d %H:%M:%S'))
+    _g62_dirs, _g62_drift, _g62_genbad, _g62_ok, _g62_hist, _g62_unclaimed = 0, [], [], 0, 0, []
+
+    def _g62_sha(_p):
+        import hashlib
+        _h = hashlib.sha256()
+        with open(_p, 'rb') as _f:
+            for _c in iter(lambda: _f.read(65536), b''):
+                _h.update(_c)
+        return _h.hexdigest()[:16].upper()
+
+    for _tname, _ad in _ans_dirs:
+        _wjf = os.path.join(_ad, '_writer.json')
+        _mds62 = sorted(_f for _f in os.listdir(_ad) if _f.lower().endswith('.md'))
+        if os.path.exists(_wjf):
+            _g62_dirs += 1
+            try:
+                _wdata = json.load(io.open(_wjf, encoding='utf-8'))
+            except Exception as _e62:
+                _g62_drift.append('%s：_writer.json 不可读（%s）' % (_tname, _e62))
+                continue
+            for _c in _wdata.get('claims', []):
+                _fp62 = os.path.join(_ad, _c.get('file', ''))
+                if not os.path.exists(_fp62):
+                    _g62_drift.append('%s/%s：登记件不在盘上' % (_tname, _c.get('file')))
+                    continue
+                if _g62_sha(_fp62) != _c.get('sha16'):
+                    _g62_drift.append('%s/%s：盘上 sha ≠ 登记 sha（改后未重登）' % (_tname, _c.get('file')))
+                    continue
+                if _c.get('generator'):
+                    _gp62 = os.path.join(_ad, _c['generator'])
+                    if not os.path.exists(_gp62):
+                        _g62_genbad.append('%s/%s：声明生成器 %s 不在同目录' % (_tname, _c.get('file'), _c['generator']))
+                    elif os.path.getmtime(_fp62) < os.path.getmtime(_gp62):
+                        _g62_genbad.append('%s/%s：答卷 mtime 早于生成器（G-61 原始症状）' % (_tname, _c.get('file')))
+                _g62_ok += 1
+        else:
+            for _f in _mds62:
+                try:
+                    _new62 = os.path.getmtime(os.path.join(_ad, _f)) >= _g62_land
+                except OSError:
+                    continue
+                if _new62:
+                    _g62_unclaimed.append('%s/%s' % (_tname, _f))
+                else:
+                    _g62_hist += 1
+    rec('g62:写手归属登记',
+        '落地时刻(2026-09-24 13:00)后新写/改写的答卷 100% 有 `_writer.json` 归属登记；已登记件 sha／生成器症状零异常（历史只报不拦）',
+        (('登记目录 %d ｜ 已验证登记 %d 件%s%s%s' % (
+            _g62_dirs, _g62_ok,
+            ('｜🔴 漂移/缺件：' + '；'.join(_g62_drift[:3])) if _g62_drift else '',
+            ('｜🔴 生成器症状：' + '；'.join(_g62_genbad[:3])) if _g62_genbad else '',
+            ('｜🔴 新写未登记：' + '、'.join(_g62_unclaimed[:3])) if _g62_unclaimed
+            else ('｜ℹ️ 历史未登记 %d 件，不阻断' % _g62_hist if _g62_hist else '')))
+         if _ans_dirs else '不适用（无 answers 目录）'),
+        not (_g62_drift or _g62_genbad or _g62_unclaimed),
+        'G-62②③④：登记＝writer_claim.py claim（他人接管须 --takeover 留痕）；落表前 verify --expect；'
+        '漂移／生成器症状＝巡检拦截。G-62① 派发纪律（一产物一写手、先停后派）见台账')
+
+    # ㉒ 三新闸自检（G-66/G-67/G-68 · 2026-09-25 · 只读）
+    #   G-67 锚一致性（日期×引文同行共现）；G-66 池覆盖（探针→池＋精选→R 层）；
+    #   G-68 证据闭包（id→全文 sha256 包；闭包/漂移双检）。三闸均带 --selftest。
+    print('\n㉒ 三新闸自检（G-66/G-67/G-68 · 只读）')
+    _gnew_bad = []
+    for _gn in ('check_anchor_consistency.py', 'check_pool_coverage.py', 'check_evidence_closure.py'):
+        _gp = os.path.join(TOOLS, _gn)
+        if not os.path.exists(_gp):
+            _gnew_bad.append(_gn + ' 缺')
+            continue
+        _rc22, _so22, _se22 = run([sys.executable, _gp, '--selftest'])
+        if _rc22 != 0:
+            _gnew_bad.append('%s selftest rc=%d' % (_gn, _rc22))
+        if _gn == 'check_pool_coverage.py':
+            # 第五轮复核 R2：常驻门禁跑池覆盖闸【全量】（防"判据只在手动全跑时生效"的假绿通道）
+            _rf22, _fo22, _fe22 = run([sys.executable, _gp])
+            if _rf22 != 0:
+                _tail22 = [l for l in (_fo22 + _fe22).splitlines() if '🔴' in l][:3]
+                _gnew_bad.append('%s 全量 rc=%d %s' % (_gn, _rf22, '；'.join(x.strip()[:90] for x in _tail22)))
+    rec('g68:三新闸自检',
+        'G-66/G-67/G-68 三闸 --selftest 全过（rc=0）',
+        (('🔴 %s' % '；'.join(_gnew_bad)) if _gnew_bad else '自检过'),
+        not _gnew_bad,
+        'G-66/67/68：锚一致性／池覆盖／证据闭包三闸活性；缺件或自检红＝不得改完')
+
     bad = [r for r in results if r['verdict'] == 'FAIL']
-    print('\n结论：%s' % ('✔ 改后门禁全绿（%d 项检查 · 含⑧教育线四闸＋⑨子模式自检＋⑩格式判据活性＋⑪Windows .cmd/退出码判空＋⑫写死版号巡检＋⑬波段 id 单源＋⑭随包清单双向＋⑮对外数字一致＋⑯插件目录解析单源）' % len(results) if not bad
+    print('\n结论：%s' % ('✔ 改后门禁全绿（%d 项检查 · 含⑧教育线四闸＋⑨子模式自检＋⑩格式判据活性＋⑪Windows .cmd/退出码判空＋⑫写死版号巡检＋⑬波段 id 单源＋⑭随包清单双向＋⑮对外数字一致＋⑯插件目录解析单源＋⑰文档↔随包对账＋⑱页级覆盖闸＋⑲产物↔生成脚本＋⑳引文归一化分歧＋㉑写手归属登记＋㉒三新闸自检）' % len(results) if not bad
                         else '🔴 %d 项不符，不得宣布"改完"' % len(bad)))
     for r in bad:
         print('   - %s：期望 %s ／ 实测 %s' % (r['gate'], r['expect'], r['actual']))

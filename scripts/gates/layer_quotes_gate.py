@@ -416,7 +416,20 @@ def main():
                                         % '/s'.join(map(str, sorted(set(found)))), q=q[:40]))
                 continue
         if idx and pgs:
-            found = [p for p in set(pgs) if match_segs(segs, page_text(idx, p))]
+            # ⚠ A-72 家族修正（2026-09-22 由新会话换书实测定位）：
+            #   本闸引文侧用 `VL.norm`（STRIP 族：**剥标点/括号/强调符**），
+            #   而页文本侧此前只用 `VC.norm`（**仅去空白、保标点**）⇒
+            #   **同一化判据两侧归一化不一致** ⇒ 任何带标点的引文都合不上，**必然假 MISS**。
+            #   实测（qushi-liliang 首次真跑）：GLOSSARY L55 引文 `因此，2021年…可能性。`
+            #   其 `VL.segments()` 段为 `因此2021年确实存在均值回归的可能性`（无标点），
+            #   而页文本为 `因此，2021年…可能性。`（带标点）⇒ `seg in pt` 永假。
+            #   修法：**页文本侧改用同一归一化 VL.norm**（两侧同尺）。
+            try:
+                import verify_layer_quotes as _VLN
+                _NT = _VLN.norm
+            except Exception:
+                _NT = VC.norm          # 兜底：至少不引入未定义名（QN/N 在本文件均未定义）
+            found = [p for p in set(pgs) if match_segs(segs, _NT(page_text(idx, p)))]
             if found:
                 n_ok += 1
                 rows.append(dict(file=fn, line=ln, state='PAGE_OK',

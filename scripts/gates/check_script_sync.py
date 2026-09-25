@@ -57,7 +57,65 @@ BACKUP = (os.environ.get('DSH_SCRIPT_SYNC_BACKUP') or
           os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                        'backup', '_script-sync'))
 PAIRS = ['machine_precheck_v2.py', 'machine_layer_readycheck.py',
-         'blindtest_lexicon_mock_v1.py', 'defense3_impersonation_scan.py']
+         'blindtest_lexicon_mock_v1.py', 'defense3_impersonation_scan.py',
+         # ── 2026-09-21 追加（用户要求"装在第三方电脑上所有功能都要能用"）──
+         #   这 29 件原只住在作者工作区 `tools\`：其中 9 件是 **SKILL.md 已让用户跑、包内却没有**
+         #   （`check_doc_tool_refs.py` 实测抓到）；另 20 件是这两日新建的通用能力件
+         #   （表体补抽流水线／页级覆盖／成本预估／答案纪律闸／问答台账／副本新鲜度闸／取数 OCR／凭据解析）。
+         #   入包位置＝`scripts/gates/`（工作区工具目录仍是**权威**，插件内是**副本** ⇒ 必须逐字节一致，
+         #   否则"测过的版本"与"装上的版本"不是同一份）。配套闸：`check_doc_tool_refs.py`。
+         'cost_attrib.py', 'coverage_by_chapter.py', 'fix_anchors_generic.py',
+         'make_edu_root_stamp.py', 'polish_scan.py', 'rquote_page_check.py',
+         'slice_verified_by_skill.py', 'split_long_lines.py', 'table_to_blocks.py',
+         'check_table_inventory.py', 'coverage_by_page_sample.py', 'estimate_cost.py',
+         'check_answer_discipline.py', 'log_qa_ledger.py', 'check_root_pair_freshness.py',
+         'extract_table_datapack.py', 'render_pdf_pages.py', 'map_table_images.py',
+         'check_table_ocr.py', 'assemble_table_bodies.py', 'ocr_deepseek_vision.py',
+         'check_doc_tool_refs.py', 'pdf_to_text.py', 'ocr_pages.py', 'build_ocr_text.py',
+         'ocr_quality_check.py', 'fix_quote_pagemarks.py', '_creds.py',
+         # ── 2026-09-21 追加（异机装完即用批的正件 ＋ 表格三形态批：形态普查／矢量表直取）──
+         'simulate_third_party_install.py', 'probe_book_form.py', 'extract_vector_tables.py',
+         # ── 2026-09-21 第2条收敛批追加（`A-101` 家族：SKILL.md 让用户"先跑"它就必须随包）──
+         #   依据：`crisis-transmission-mapper\SKILL.md` 的「可机核等式」第 1／5 条明写
+         #         `python tools\scan_pool_counterexamples.py …` 与 `… --check <答案.md>`；
+         #         异机装完没有这个文件 ⇒ 用户**拿不到核验等式的手段**（发行层缺口）。
+         #   本批给它新增的能力：`--check`（等式机核，rc≠0 即把差异集逐条列出）
+         #   ＋ `--write-template`（生成处置清单模板，行集合＝命中集合 T）。
+         'scan_pool_counterexamples.py',
+         # ── 2026-09-21 §27 批追加（7 条验收标准的机核闸）──
+         'distill_acceptance_check.py',
+         # ── 2026-09-21 仪器充分性闸（`A-157`／`A-158`：回答"判据修够了没有"）──
+         #   依据用户提问「这个循环到底怎么回事？有没有一次彻底解决完？」：
+         #   经实测，一天内 14 处缺陷**全部**出在我方判据/代码/流程/读数工具，
+         #   故必须有一件"判据自己够不够"的闸，把"继续修还是停"从手感变成可判定。
+         'instrument_sufficiency.py',
+         # ── 2026-09-21 三基线运行时闸（用户问「有什么办法**一定**可以做到那三条」）──
+         #   把「点回原文／标注推测／先追问缺信息」从"模型自觉"改成
+         #   **产物三槽形态（[原文]／[外推]／[缺信息]）＋ 机器逐条判**：
+         #   引文回源未命中 ⇒ 红；【外推】未写前提 ⇒ 红；缺信息型问句无判停与字段清单 ⇒ 红。
+         #   首战即抓到真实事故：盲测答卷里有 2 条"原句"在原文册中逐字**不存在**。
+         'assertion_gate.py',
+         # ── 2026-09-21 语料绑定闸（"把甲册当乙书"这类语料错配事故的直接教训）──
+         #   派单**前**跑：路径存在／主题命中／锚形态同代／下游清单可读。
+         #   实测判别力：同一技能 + 错册（主题命中 2/12）⇒ 红；+ 对册（12/12）⇒ 绿。
+         'corpus_binding_check.py',
+         # ── 2026-09-21 孤儿闸检查（找出"造了却没挂进任何入口"的闸）──
+         #   发现经过：用户问「这三条现在是一定做了还是触发时必须做？」——
+         #   实测三件运行时闸**通过自证、也进了包**，但 preflight/postflight **一处都没引用**
+         #   ⇒ "触发时必须做"在执行层无法保证。本件把该缺口变成可报出的数（44 件门禁里 20 件是孤儿）。
+         'orphan_gate_check.py',
+         # ── 2026-09-21 触发判定卡（回答「什么时候做／什么时候不做，谁说了算」）──
+         #   把"要不要做那三条"从**我的自由裁量**变成：机器起草疑似触发 → 人逐条确认并**附问句原句片段**
+         #   → 机器回查片段是否真在问句里（编的证据必被拦）→ 答案须与卡一致。
+         'trigger_card.py']
+
+
+def plug_path(name):
+    """插件内副本位置：`scripts\\<名>` 或 `scripts\\gates\\<名>`（两种布局都认，不猜）。"""
+    for cand in (os.path.join(PLUGIN, name), os.path.join(PLUGIN, 'gates', name)):
+        if os.path.exists(cand):
+            return cand
+    return os.path.join(PLUGIN, name)
 
 md5 = lambda p: hashlib.md5(io.open(p, 'rb').read()).hexdigest()
 only = lambda p: hashlib.md5(io.open(p, 'rb').read()).hexdigest()[:12]
@@ -68,7 +126,7 @@ drift, missing, same, na = [], [], 0, []
 
 for name in PAIRS:
     a = next((os.path.join(d, name) for d in AUTH_DIRS if os.path.exists(os.path.join(d, name))), None)
-    b = os.path.join(PLUGIN, name)
+    b = plug_path(name)
     if a is None and not os.path.exists(b):
         # 两边都没有 ⇒ **不适用**（例：本工作区未装该插件，或该册未产出这 4 件），不是"缺件"
         na.append(name)

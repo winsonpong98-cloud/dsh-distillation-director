@@ -825,9 +825,16 @@ def run(skill_path):
 
 def main():
     global HOST_ONLY_REFS, BOOK_BASE_OVERRIDE, LEGACY_BOOK_CHECKS
-    if len(sys.argv) < 2:
-        print("usage: python machine_precheck_v2.py <SKILL.md> [--out out.json] "
-              "[--book-base <该书册根目录>] [--drafts-in-refs] [--legacy-book-checks]")
+    USAGE = ("usage: python machine_precheck_v2.py <SKILL.md> [--out out.json] "
+             "[--book-base <该书册根目录>] [--drafts-in-refs] [--legacy-book-checks]")
+    # ⚠ 2026-09-21（异机装完即用批）：本件随包发行，用户第一句常是 `--help` 或路径写错；
+    #   旧版把 `--help` 当被检文件路径 ⇒ `open('--help')` 抛裸栈（异机仿真实测抓到）。
+    #   现：`-h/--help` 打用法（rc=0）；路径不存在 ⇒ 明确报错 ＋ 用法（rc=2）。都不发裸栈。
+    if len(sys.argv) < 2 or sys.argv[1] in ('-h', '--help'):
+        print(USAGE)
+        sys.exit(0 if len(sys.argv) > 1 else 2)
+    if not os.path.isfile(sys.argv[1]):
+        print("🔴 找不到被检 SKILL.md：%s\n%s" % (sys.argv[1], USAGE))
         sys.exit(2)
     if "--drafts-in-refs" in sys.argv:          # 复现 v4.2 之前的 d6-c1 旧口径
         HOST_ONLY_REFS = False

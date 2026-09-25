@@ -116,8 +116,11 @@ def detect_pagemark(path):
     return 'dash'
 
 
-def norm(s):
-    return re.sub(r"\s+", "", s)
+# ── 归一化＝**单一来源**（`G-57①` · 2026-09-24）：`norm`／`norm_match`／映射表整体迁入
+#    `tools\_qnorm.py`，此处只导入并保名（约 40 处 `import verify_candidates as VC` 的下游
+#    全走 `VC.norm`／`VC.norm_match`／`VC._PUNCT_TABLE`，改名即破坏面扩大）。
+from _qnorm import (norm_ws as norm, norm_match,                    # noqa: E402,F401
+                    QUOTE_MAP as _QUOTE_MAP, PUNCT_TABLE as _PUNCT_TABLE)  # G-57① 单一来源
 
 
 # ── 源文件决议：**唯一一份**（探测与逐文件校验共用）· A-133 ────────────────────────
